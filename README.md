@@ -19,26 +19,17 @@ This is due **INSTRUCTOR TODO** evening at midnight.
 
 **Summary:** **INSTRUCTOR TODO**
 
-In this project, you will use CUDA to implement a simplified standard
+In this project, you will use CUDA to implement a simplified
 rasterized graphics pipeline, similar to the OpenGL pipeline. You will
 implement vertex shading, primitive assembly, rasterization, fragment shading,
 and a framebuffer. More information about the rasterized graphics pipeline can
 be found in the class slides and in the CIS 560 lecture notes.
 
-The base code provided includes an OBJ loader and much of the mundane I/O and
+The base code provided includes an OBJ loader and much of the I/O and
 bookkeeping code. It also includes some functions that you may find useful,
 described below. The core rasterization pipeline is left for you to implement.
 
-A rasterizer is **NOT**:
-
-* A ray tracer. You shouldn't be doing any ray casting anywhere in the project
-  (... unless you do some fancy raytraced effects in your fragment shader).
-  This project will let you generate graphics WITHOUT the need for ray casting!
-* An OpenGL rendering engine. You shouldn't write any new OpenGL code - think
-  of your project as a reimplementation of OpenGL's core pipeline.
-
-Finally, note that, while this base code is meant to serve as a strong starting
-point for a CUDA path tracer, you are not required to use it if you don't want
+You are not required to use this base code if you don't want
 to. You may also change any part of the base code as you please.
 **This is YOUR project.**
 
@@ -77,15 +68,15 @@ the console for errors.
 In this project, you are given code for:
 
 * A library for loading/reading standard Alias/Wavefront `.obj` format mesh
-  files and converting them to OpenGL style VBOs/IBOs
+  files and converting them to OpenGL-style vertex and index buffers
 * A suggested order of kernels with which to implement the graphics pipeline
-* Working code for CUDA-GL interop
+* CUDA-GL interop
 
 You will need to implement the following features/pipeline stages:
 
 * Vertex shading.
 * (Vertex shader) perspective transformation.
-* Primitive assembly with support for triangle VBOs/IBOs.
+* Primitive assembly with support for triangle vertex and index buffers.
 * Rasterization: **either** a scanline or a tiled approach.
 * Fragment shading.
 * A depth buffer for storing and depth testing fragments.
@@ -98,21 +89,20 @@ You are also required to implement at least "3.0" of the following features.
 (the parenthesized numbers must add to 3.0 or more):
 
 * Additional pipeline stages.
+   * (1.0) Tessellation shader.
    * (1.0) Geometry shader.
    * (1.0) Transform feedback.
-   * (1.0) Stencil test.
    * (0.5) Back-face culling with stream compaction.
    * (0.5) Scissor test.
    * (0.5) Blending.
+* (1.0) Instancing
 * (0.5) Correct color interpolation between points on a primitive.
 * (1.0) UV texture mapping with bilinear texture filtering and perspective correct texture coordinates.
 * Support for rasterizing additional primitives:
-   * (0.5) Lines.
-   * (0.5) Line strips.
-   * (0.5) Triangle fans.
-   * (0.5) Triangle strips.
+   * (0.5) Lines or line strips.
    * (0.5) Points.
 * (1.0) Anti-aliasing
+* (1.0) Occlusion queries
 * (1.0) Order-independent translucency using a k-buffer
 * (0.5) **Mouse**-based interactive camera support.
 
@@ -157,7 +147,7 @@ necessary time spent debugging.
 * Fragment shading.
   * `fragmentIn[m] fs_input -> fragmentOut[m] fs_output`
   * A super-simple test fragment shader: output same color for every fragment.
-    * Also try Tdisplaying various debug views (normals, etc.)
+    * Also try displaying various debug views (normals, etc.)
 * Fragments to depth buffer.
   * `fragmentOut[m] -> fragmentOut[resolution]`
   * Can really be done inside the fragment shader.
@@ -282,17 +272,16 @@ The following resources may be useful for this project:
 
 ## README
 
-All students must replace or augment the contents of this Readme.md in a clear 
-manner with the following:
+Replace the contents of this README.md in a clear manner with the following:
 
 * A brief description of the project and the specific features you implemented.
 * At least one screenshot of your project running.
 * A 30 second or longer video of your project running.
-* A performance evaluation (described in detail below).
+* A performance analysis (described below).
 
 ### Performance Analysis
 
-The performance evaluation is where you will investigate how to make your CUDA
+The performance analysis is where you will investigate how to make your CUDA
 programs more efficient using the skills you've learned in class. You must have
 performed at least one experiment on your code to investigate the positive or
 negative effects on performance. 
