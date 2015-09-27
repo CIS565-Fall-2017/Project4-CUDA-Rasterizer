@@ -1,11 +1,10 @@
-// CIS565 CUDA Rasterizer: A simple rasterization pipeline for Patrick Cozzi's CIS565: GPU Computing at the University of Pennsylvania
-// Written by Yining Karl Li, Copyright (c) 2012 University of Pennsylvania
+#include "rasterize.h"
 
-#include <stdio.h>
-#include <cuda.h>
 #include <cmath>
+#include <cstdio>
+#include <cuda.h>
 #include <thrust/random.h>
-#include "rasterizeKernels.h"
+#include "checkCUDAError.h"
 #include "rasterizeTools.h"
 
 glm::vec3* framebuffer;
@@ -15,15 +14,7 @@ float* device_cbo;
 int* device_ibo;
 triangle* primitives;
 
-void checkCUDAError(const char *msg) {
-  cudaError_t err = cudaGetLastError();
-  if( cudaSuccess != err) {
-    fprintf(stderr, "Cuda error: %s: %s.\n", msg, cudaGetErrorString( err) ); 
-    exit(EXIT_FAILURE); 
-  }
-} 
-
-//Handy dandy little hashing function that provides seeds for random number generation
+// Handy dandy little hashing function that provides seeds for random number generation
 __host__ __device__ unsigned int hash(unsigned int a){
     a = (a+0x7ed55d16) + (a<<12);
     a = (a^0xc761c23c) ^ (a>>19);
@@ -34,7 +25,7 @@ __host__ __device__ unsigned int hash(unsigned int a){
     return a;
 }
 
-//Writes a given fragment to a fragment buffer at a given location
+// Writes a given fragment to a fragment buffer at a given location
 __host__ __device__ void writeToDepthbuffer(int x, int y, fragment frag, fragment* depthbuffer, glm::vec2 resolution){
   if(x<resolution.x && y<resolution.y){
     int index = (y*resolution.x) + x;
@@ -42,7 +33,7 @@ __host__ __device__ void writeToDepthbuffer(int x, int y, fragment frag, fragmen
   }
 }
 
-//Reads a fragment from a given location in a fragment buffer
+// Reads a fragment from a given location in a fragment buffer
 __host__ __device__ fragment getFromDepthbuffer(int x, int y, fragment* depthbuffer, glm::vec2 resolution){
   if(x<resolution.x && y<resolution.y){
     int index = (y*resolution.x) + x;
@@ -53,7 +44,7 @@ __host__ __device__ fragment getFromDepthbuffer(int x, int y, fragment* depthbuf
   }
 }
 
-//Writes a given pixel to a pixel buffer at a given location
+// Writes a given pixel to a pixel buffer at a given location
 __host__ __device__ void writeToFramebuffer(int x, int y, glm::vec3 value, glm::vec3* framebuffer, glm::vec2 resolution){
   if(x<resolution.x && y<resolution.y){
     int index = (y*resolution.x) + x;
@@ -61,7 +52,7 @@ __host__ __device__ void writeToFramebuffer(int x, int y, glm::vec3 value, glm::
   }
 }
 
-//Reads a pixel from a pixel buffer at a given location
+// Reads a pixel from a pixel buffer at a given location
 __host__ __device__ glm::vec3 getFromFramebuffer(int x, int y, glm::vec3* framebuffer, glm::vec2 resolution){
   if(x<resolution.x && y<resolution.y){
     int index = (y*resolution.x) + x;
@@ -71,7 +62,7 @@ __host__ __device__ glm::vec3 getFromFramebuffer(int x, int y, glm::vec3* frameb
   }
 }
 
-//Kernel that clears a given pixel buffer with a given color
+// Kernel that clears a given pixel buffer with a given color
 __global__ void clearImage(glm::vec2 resolution, glm::vec3* image, glm::vec3 color){
     int x = (blockIdx.x * blockDim.x) + threadIdx.x;
     int y = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -81,7 +72,7 @@ __global__ void clearImage(glm::vec2 resolution, glm::vec3* image, glm::vec3 col
     }
 }
 
-//Kernel that clears a given fragment buffer with a given fragment
+// Kernel that clears a given fragment buffer with a given fragment
 __global__ void clearDepthBuffer(glm::vec2 resolution, fragment* buffer, fragment frag){
     int x = (blockIdx.x * blockDim.x) + threadIdx.x;
     int y = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -94,7 +85,7 @@ __global__ void clearDepthBuffer(glm::vec2 resolution, fragment* buffer, fragmen
     }
 }
 
-//Kernel that writes the image to the OpenGL PBO directly. 
+// Kernel that writes the image to the OpenGL PBO directly. 
 __global__ void sendImageToPBO(uchar4* PBOpos, glm::vec2 resolution, glm::vec3* image){
   
   int x = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -128,14 +119,14 @@ __global__ void sendImageToPBO(uchar4* PBOpos, glm::vec2 resolution, glm::vec3* 
   }
 }
 
-//TODO: Implement a vertex shader
+// TODO: Implement a vertex shader
 __global__ void vertexShadeKernel(float* vbo, int vbosize){
   int index = (blockIdx.x * blockDim.x) + threadIdx.x;
   if(index<vbosize/3){
   }
 }
 
-//TODO: Implement primative assembly
+// TODO: Implement primative assembly
 __global__ void primitiveAssemblyKernel(float* vbo, int vbosize, float* cbo, int cbosize, int* ibo, int ibosize, triangle* primitives){
   int index = (blockIdx.x * blockDim.x) + threadIdx.x;
   int primitivesCount = ibosize/3;
@@ -143,14 +134,14 @@ __global__ void primitiveAssemblyKernel(float* vbo, int vbosize, float* cbo, int
   }
 }
 
-//TODO: Implement a rasterization method, such as scanline.
+// TODO: Implement a rasterization method, such as scanline.
 __global__ void rasterizationKernel(triangle* primitives, int primitivesCount, fragment* depthbuffer, glm::vec2 resolution){
   int index = (blockIdx.x * blockDim.x) + threadIdx.x;
   if(index<primitivesCount){
   }
 }
 
-//TODO: Implement a fragment shader
+// TODO: Implement a fragment shader
 __global__ void fragmentShadeKernel(fragment* depthbuffer, glm::vec2 resolution){
   int x = (blockIdx.x * blockDim.x) + threadIdx.x;
   int y = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -159,7 +150,7 @@ __global__ void fragmentShadeKernel(fragment* depthbuffer, glm::vec2 resolution)
   }
 }
 
-//Writes fragment colors to the framebuffer
+// Writes fragment colors to the framebuffer
 __global__ void render(glm::vec2 resolution, fragment* depthbuffer, glm::vec3* framebuffer){
 
   int x = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -179,15 +170,15 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, float*
   dim3 threadsPerBlock(tileSize, tileSize);
   dim3 fullBlocksPerGrid((int)ceil(float(resolution.x)/float(tileSize)), (int)ceil(float(resolution.y)/float(tileSize)));
 
-  //set up framebuffer
+  // set up framebuffer
   framebuffer = NULL;
   cudaMalloc((void**)&framebuffer, (int)resolution.x*(int)resolution.y*sizeof(glm::vec3));
   
-  //set up depthbuffer
+  // set up depthbuffer
   depthbuffer = NULL;
   cudaMalloc((void**)&depthbuffer, (int)resolution.x*(int)resolution.y*sizeof(fragment));
 
-  //kernel launches to black out accumulated/unaccumlated pixel buffers and clear our scattering states
+  // kernel launches to black out accumulated/unaccumlated pixel buffers and clear our scattering states
   clearImage<<<fullBlocksPerGrid, threadsPerBlock>>>(resolution, framebuffer, glm::vec3(0,0,0));
   
   fragment frag;
@@ -196,9 +187,9 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, float*
   frag.position = glm::vec3(0,0,-10000);
   clearDepthBuffer<<<fullBlocksPerGrid, threadsPerBlock>>>(resolution, depthbuffer,frag);
 
-  //------------------------------
-  //memory stuff
-  //------------------------------
+  // ------------------------------
+  // memory stuff
+  // ------------------------------
   primitives = NULL;
   cudaMalloc((void**)&primitives, (ibosize/3)*sizeof(triangle));
 
@@ -217,34 +208,34 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, float*
   tileSize = 32;
   int primitiveBlocks = ceil(((float)vbosize/3)/((float)tileSize));
 
-  //------------------------------
-  //vertex shader
-  //------------------------------
+  // ------------------------------
+  // vertex shader
+  // ------------------------------
   vertexShadeKernel<<<primitiveBlocks, tileSize>>>(device_vbo, vbosize);
 
   cudaDeviceSynchronize();
-  //------------------------------
-  //primitive assembly
-  //------------------------------
+  // ------------------------------
+  // primitive assembly
+  // ------------------------------
   primitiveBlocks = ceil(((float)ibosize/3)/((float)tileSize));
   primitiveAssemblyKernel<<<primitiveBlocks, tileSize>>>(device_vbo, vbosize, device_cbo, cbosize, device_ibo, ibosize, primitives);
 
   cudaDeviceSynchronize();
-  //------------------------------
-  //rasterization
-  //------------------------------
+  // ------------------------------
+  // rasterization
+  // ------------------------------
   rasterizationKernel<<<primitiveBlocks, tileSize>>>(primitives, ibosize/3, depthbuffer, resolution);
 
   cudaDeviceSynchronize();
-  //------------------------------
-  //fragment shader
-  //------------------------------
+  // ------------------------------
+  // fragment shader
+  // ------------------------------
   fragmentShadeKernel<<<fullBlocksPerGrid, threadsPerBlock>>>(depthbuffer, resolution);
 
   cudaDeviceSynchronize();
-  //------------------------------
-  //write fragments to framebuffer
-  //------------------------------
+  // ------------------------------
+  // write fragments to framebuffer
+  // ------------------------------
   render<<<fullBlocksPerGrid, threadsPerBlock>>>(resolution, depthbuffer, framebuffer);
   sendImageToPBO<<<fullBlocksPerGrid, threadsPerBlock>>>(PBOpos, resolution, framebuffer);
 

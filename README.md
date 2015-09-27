@@ -35,7 +35,7 @@ A rasterizer is **NOT**:
   (... unless you do some fancy raytraced effects in your fragment shader).
   This project will let you generate graphics WITHOUT the need for ray casting!
 * An OpenGL rendering engine. You shouldn't write any new OpenGL code - think
-  of your project as a reimplementation of a few of OpenGL's features.
+  of your project as a reimplementation of OpenGL's core pipeline.
 
 Finally, note that, while this base code is meant to serve as a strong starting
 point for a CUDA path tracer, you are not required to use it if you don't want
@@ -86,10 +86,10 @@ You will need to implement the following features/pipeline stages:
 * Vertex shading.
 * (Vertex shader) perspective transformation.
 * Primitive assembly with support for triangle VBOs/IBOs.
-* Rasterization through either a scanline or a tiled approach.
+* Rasterization: **either** a scanline or a tiled approach.
 * Fragment shading.
 * A depth buffer for storing and depth testing fragments.
-* Fragment to framebuffer writing (**with** atomics for race avoidance).
+* Fragment to depth buffer writing (**with** atomics for race avoidance).
 * (Fragment shader) simple lighting scheme, such as Lambert or Blinn-Phong.
 
 See below for more guidance.
@@ -128,50 +128,83 @@ For each extra feature, please provide the following analysis:
 * How might this feature be optimized beyond your current implementation?
 
 
-## Minimal Rasterization Pipeline
+## Rasterization Pipeline
 
 **INSTRUCTOR TODO**: update README to explain a minimal pipeline to see a
 triangle, e.g., no depth test, draw in NDC, etc.
 
-* Vertex shading.
+Possible pipelines are described below. Pseudo-type-signatures are given.
+Not all of the pseudocode arrays will necessarily actually exist in practice.
+
+### Minimal Pipeline
+
+This describes a minimal version *one possible* graphics pipeline, similar to
+modern hardware (DX/OpenGL). Yours need not match precisely.  To begin, try to
+write a minimal amount of code as described here. This will reduce the
+necessary time spent debugging.
+
+* Vertex shading: 
+  * `VertexIn[n] vs_input -> VertexOut[n] vs_output`
   * A minimal vertex shader will apply no transformations at all - it draws
     directly in normalized device coordinates (NDC).
 * Primitive assembly.
+  * `vertexOut[n] vs_output -> triangle[n/3] primitives`
   * Start by supporting ONLY triangles.
 * Rasterization.
+  * `triangle[n/3] primitives -> fragmentIn[m] fs_input`
   * Scanline: TODO
-    * Optimization: scissor around rasterized triangle
   * Tiled: TODO
 * Fragment shading.
-  * A test fragment shader can produce the same color for every fragment.
-  * Try displaying various debug views (normals, etc.)
+  * `fragmentIn[m] fs_input -> fragmentOut[m] fs_output`
+  * A super-simple test fragment shader: output same color for every fragment.
+    * Also try Tdisplaying various debug views (normals, etc.)
+* Fragments to depth buffer.
+  * `fragmentOut[m] -> fragmentOut[resolution]`
+  * Can really be done inside the fragment shader.
+  * Results in race conditions - don't bother to fix these until it works!
 * A depth buffer for storing and depth testing fragments.
+  * `fragmentOut[resolution] depthbuffer`
   * An array of `fragment` objects.
   * At the end of a frame, it should contain the fragments drawn to the screen.
 * Fragment to framebuffer writing.
-  * You will need to use atomics for race avoidance, to prevent different
-    primitives from overwriting each other in the wrong order.
-  * You can ignore this when starting! The race conditions will only cause
-    visual artifacts.
-  * TODO
+  * `fragmentOut[resolution] depthbuffer -> vec3[resolution] framebuffer`
+  * Simply copies the colors out of the depth buffer into the framebuffer
+    (to be displayed on the screen).
+
+### Better Pipeline
+
+INSTRUCTOR TODO
+
+* Rasterization.
+  * Scanline:
+    * Optimization: scissor around rasterized triangle
+
+* Fragments to depth buffer.
+  * `fragmentOut[m] -> fragmentOut[resolution]`
+  * Can really be done inside the fragment shader.
+    * This allows you to do depth tests before spending execution time in
+      complex fragment shader code.
+  * When writing to the depth buffer, you will need to use atomics for race
+    avoidance, to prevent different primitives from overwriting each other in
+    the wrong order.
 
 
 ## Base Code Tour
 
-**INSTRUCTOR TODO:** update according to any code changes. LOOK -> CHECKITOUT.
+**INSTRUCTOR TODO:** update according to any code changes.
 TODO: simple structs for every part of the pipeline, intended to be changed?
 (e.g. vertexPre, vertexPost, triangle = vertexPre[3], fragment).
 TODO: autoformat code
 TODO: pragma once
 TODO: doxygen
 
-You will be working primarily in two files: `rasterizeKernel.cu`, and
-`rasterizerTools.h`. Within these files, areas that you need to complete are
+You will be working primarily in two files: `rasterize.cu`, and
+`rasterizeTools.h`. Within these files, areas that you need to complete are
 marked with a `TODO` comment. Areas that are useful to and serve as hints for
 optional features are marked with `TODO (Optional)`. Functions that are useful
-for reference are marked with the comment `LOOK`.
+for reference are marked with the comment `CHECKITOUT`.
 
-* `src/rasterizeKernels.cu` contains the core rasterization pipeline. 
+* `src/rasterize.cu` contains the core rasterization pipeline. 
   * A suggested sequence of kernels exists in this file, but you may choose to
     alter the order of this sequence or merge entire kernels if you see fit.
     For example, if you decide that doing has benefits, you can choose to merge
