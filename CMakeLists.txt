@@ -1,99 +1,94 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.0)
 
-#on OSX we have to explicitly set clang/clang++
-#set (CMAKE_C_COMPILER clang)
-#set (CMAKE_CXX_COMPILER clang++)
+project(cis565_rasterizer)
 
-project(Project4-Rasterizer)
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
-
-#External libs location (alternatively, /usr/local or something)
-set(EXTERNAL "external")
-
-#Set up include and lib paths
-include_directories(${EXTERNAL}/include)
-include_directories(${EXTERNAL}/src)
+# Set up include and lib paths
+include_directories(.)
+include_directories("external")
+include_directories("external/include")
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-	set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} ${EXTERNAL}/lib/osx)
+    set(EXTERNAL_LIB_PATH "external/lib/osx")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-	set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} ${EXTERNAL}/lib/linux /usr/lib64)
+    set(EXTERNAL_LIB_PATH "external/lib/linux" "/usr/lib64")
 elseif(WIN32)
-	set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} ${EXTERNAL}/lib/win)
+    set(EXTERNAL_LIB_PATH "external/lib/win")
 endif()
+link_directories(${EXTERNAL_LIB_PATH})
+list(APPEND CMAKE_LIBRARY_PATH "${EXTERNAL_LIB_PATH}")
 
-set(GLFW_INCLUDE_DIR ${EXTERNAL}/include)
-set(GLFW_LIBRARY_DIR ${CMAKE_LIBRARY_PATH})
-set(GLEW_INCLUDE_DIR ${EXTERNAL}/include)
-set(GLEW_LIBRARY_DIR ${CMAKE_LIBRARY_PATH})
 
-#Find up and set up core dependency libs
-find_library(GLFW_LIBRARY "glfw3" HINTS ${GLFW_LIBRARY_DIR})
-find_package(GLUT)
-find_package(OpenGL)
+# Find up and set up core dependency libs
+
+set(GLFW_INCLUDE_DIR "external/include")
+set(GLFW_LIBRARY_DIR "${CMAKE_LIBRARY_PATH}")
+find_library(GLFW_LIBRARY "glfw3" HINTS "${GLFW_LIBRARY_DIR}")
+
+set(GLEW_INCLUDE_DIR "external/include")
+set(GLEW_LIBRARY_DIR "${CMAKE_LIBRARY_PATH}")
+add_definitions(-DGLEW_STATIC)
 find_package(GLEW)
 
-set(CORELIBS ${GLFW_LIBRARY} ${GLUT_LIBRARY} ${OPENGL_LIBRARY} ${GLEW_LIBRARY})
+find_package(OpenGL)
 
-#OSX-specific hacks/fixes
+set(CORELIBS
+    "${GLFW_LIBRARY}"
+    "${OPENGL_LIBRARY}"
+    "${GLEW_LIBRARY}"
+    )
+
+# Enable C++11 for host code
+set(CMAKE_CXX_STANDARD 11)
+
+# Set up different build configurations
+set(CMAKE_CONFIGURATION_TYPES Debug DebugFast Release)
+set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
+set(CMAKE_CXX_FLAGS_DEBUGFAST "-O2 -g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+list(APPEND CUDA_NVCC_FLAGS_DEBUG -O0 -G -g)
+list(APPEND CUDA_NVCC_FLAGS_DEBUGFAST -O2 -g -lineinfo)
+list(APPEND CUDA_NVCC_FLAGS_RELEASE -O3)
+
+# OS X linker options
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-   	#Link IOKit because this is where we get GL stuff for OSX
-   	set(IOKIT "-framework IOKit")
-	set(CORELIBS ${CORELIBS} ${IOKIT})
-	#Link against libstdc++ since CUDA doesn't support libc++ yet
-	set(CUDA_NVCC_FLAGS "--compiler-options;-stdlib=libstdc++;")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++")
-endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    list(APPEND CORELIBS "-framework IOKit")
+    list(APPEND CORELIBS "-framework Cocoa")
+    list(APPEND CORELIBS "-framework CoreVideo")
+endif()
 
-#Linux specific hacks/fixes
+# Linux linker options
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lX11 -lXxf86vm -lXrandr -lpthread -lXi")
+    list(APPEND CMAKE_EXE_LINKER_FLAGS "-lX11 -lXxf86vm -lXrandr -lXi")
 endif()
 
-#Compiler flag magic
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -m64 -msse2")
-elseif(WIN32)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-endif()
-
-#Crucial magic for CUDA linking
+# CUDA linker options
+find_package(Threads REQUIRED)
 find_package(CUDA REQUIRED)
 set(CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE ON)
-
 set(CUDA_SEPARABLE_COMPILATION ON)
 
-#Make NVCC run silently
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-	set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}-w;")
-endif()
+#add_subdirectory(stream_compaction)  # TODO: uncomment if using your own stream compaction
+add_subdirectory(src)
+add_subdirectory(util)
 
-#Force Visual Studio to link against MT versions of libs
-if(MSVC)
-	set(CompilerFlags
-	        CMAKE_CXX_FLAGS
-	        CMAKE_CXX_FLAGS_DEBUG
-	        CMAKE_CXX_FLAGS_RELEASE
-	        CMAKE_C_FLAGS
-	        CMAKE_C_FLAGS_DEBUG
-	        CMAKE_C_FLAGS_RELEASE
-	        )
-	foreach(CompilerFlag ${CompilerFlags})
-	  string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
-	endforeach()
-	set(CUDA_NVCC_FLAGS_RELEASE ${CUDA_NVCC_FLAGS_RELEASE} "--compiler-options /MT; --linker-options /MT")
-	set(CUDA_NVCC_FLAGS_DEBUG ${CUDA_NVCC_FLAGS_DEBUG} "--compiler-options /MT; --linker-options /MT")
-endif()
+cuda_add_executable(${CMAKE_PROJECT_NAME}
+    "src/main.h"
+    "src/main.cpp"
+    )
 
-#Add all source files. Headers don't need to be listed here since the compiler will find them;
-#we just need the actual files being fed directly to the compiler
-set(SOURCE_FILES "src/main.cpp")
-set(SOURCE_FILES ${SOURCE_FILES} "src/rasterizeKernels.cu")
-set(SOURCE_FILES ${SOURCE_FILES} "src/utilities.cpp")
-set(SOURCE_FILES ${SOURCE_FILES} "${EXTERNAL}/src/glslUtil/glslUtility.cpp")
-set(SOURCE_FILES ${SOURCE_FILES} "${EXTERNAL}/src/objUtil/obj.cpp")
-set(SOURCE_FILES ${SOURCE_FILES} "${EXTERNAL}/src/objUtil/objloader.cpp")
+target_link_libraries(${CMAKE_PROJECT_NAME}
+    src
+    util
+    #stream_compaction  # TODO: uncomment if using your own stream compaction
+    ${CORELIBS}
+    )
 
-cuda_add_executable(Project4-Rasterizer ${SOURCE_FILES} OPTIONS -arch=sm_20)
-
-target_link_libraries(Project4-Rasterizer ${CORELIBS})
+add_custom_command(
+    TARGET ${CMAKE_PROJECT_NAME}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/shaders
+        ${CMAKE_BINARY_DIR}/shaders
+    )

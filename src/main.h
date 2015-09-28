@@ -7,21 +7,19 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include <cuda_runtime.h>
-#include <cuda_gl_interop.h>
+#include <cstdlib>
+#include <ctime>
 #include <fstream>
-#include <glm/glm.hpp>
-#include <glslUtil/glslUtility.hpp>
 #include <iostream>
-#include <objUtil/objloader.h>
 #include <sstream>
-#include <stdlib.h>
 #include <string>
-#include <time.h>
-
-
-#include "rasterizeKernels.h"
-#include "utilities.h"
+#include <cuda_gl_interop.h>
+#include <cuda_runtime.h>
+#include <glm/glm.hpp>
+#include <util/glslUtility.hpp>
+#include <util/utilityCore.hpp>
+#include <util/objloader.hpp>
+#include "rasterize.h"
 
 using namespace std;
 
@@ -41,26 +39,18 @@ uchar4 *dptr;
 
 GLFWwindow *window;
 
-obj* mesh;
-
-float* vbo;
-int vbosize;
-float* cbo;
-int cbosize;
-int* ibo;
-int ibosize;
-
 //-------------------------------
 //----------CUDA STUFF-----------
 //-------------------------------
 
-int width = 800; int height = 800;
+int width = 800;
+int height = 800;
 
 //-------------------------------
 //-------------MAIN--------------
 //-------------------------------
 
-int main(int argc, char** argv);
+int main(int argc, char **argv);
 
 //-------------------------------
 //---------RUNTIME STUFF---------
@@ -69,16 +59,16 @@ int main(int argc, char** argv);
 void runCuda();
 
 #ifdef __APPLE__
-	void display();
+void display();
 #else
-	void display();
-	void keyboard(unsigned char key, int x, int y);
+void display();
+void keyboard(unsigned char key, int x, int y);
 #endif
 
 //-------------------------------
 //----------SETUP STUFF----------
 //-------------------------------
-bool init(int argc, char* argv[]);
+bool init(obj *mesh);
 void initPBO();
 void initCuda();
 void initTextures();
@@ -90,8 +80,8 @@ GLuint initShader();
 //-------------------------------
 
 void cleanupCuda();
-void deletePBO(GLuint* pbo);
-void deleteTexture(GLuint* tex);
+void deletePBO(GLuint *pbo);
+void deleteTexture(GLuint *tex);
 
 //------------------------------
 //-------GLFW CALLBACKS---------

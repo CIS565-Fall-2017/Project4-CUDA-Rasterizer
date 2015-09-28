@@ -2,5 +2,9 @@
 
 #include <glm/glm.hpp>
 
-void kernelCleanup();
-void cudaRasterizeCore(uchar4* pos, glm::vec2 resolution, float frame, float* vbo, int vbosize, float* cbo, int cbosize, int* ibo, int ibosize);
+void rasterizeInit(int width, int height);
+void rasterizeSet(
+        int bufIdxSize, int *bufIdx,
+        int vertCount, float *bufPos, float *bufNor, float *bufCol);
+void rasterize(uchar4 *pbo);
+void rasterizeFree();

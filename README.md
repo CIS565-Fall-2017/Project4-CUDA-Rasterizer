@@ -133,31 +133,32 @@ modern hardware (DX/OpenGL). Yours need not match precisely.  To begin, try to
 write a minimal amount of code as described here. This will reduce the
 necessary time spent debugging.
 
+* Clear the depth buffer with some default value.
 * Vertex shading: 
   * `VertexIn[n] vs_input -> VertexOut[n] vs_output`
   * A minimal vertex shader will apply no transformations at all - it draws
-    directly in normalized device coordinates (NDC).
+    directly in normalized device coordinates (-1 to 1 in each dimension).
 * Primitive assembly.
-  * `vertexOut[n] vs_output -> triangle[n/3] primitives`
+  * `VertexOut[n] vs_output -> Triangle[n/3] primitives`
   * Start by supporting ONLY triangles.
 * Rasterization.
-  * `triangle[n/3] primitives -> fragmentIn[m] fs_input`
+  * `Triangle[n/3] primitives -> FragmentIn[m] fs_input`
   * Scanline: TODO
   * Tiled: TODO
 * Fragment shading.
-  * `fragmentIn[m] fs_input -> fragmentOut[m] fs_output`
+  * `FragmentIn[m] fs_input -> FragmentOut[m] fs_output`
   * A super-simple test fragment shader: output same color for every fragment.
     * Also try displaying various debug views (normals, etc.)
 * Fragments to depth buffer.
-  * `fragmentOut[m] -> fragmentOut[resolution]`
+  * `FragmentOut[m] -> FragmentOut[width][height]`
   * Can really be done inside the fragment shader.
   * Results in race conditions - don't bother to fix these until it works!
 * A depth buffer for storing and depth testing fragments.
-  * `fragmentOut[resolution] depthbuffer`
+  * `FragmentOut[width][height] depthbuffer`
   * An array of `fragment` objects.
   * At the end of a frame, it should contain the fragments drawn to the screen.
 * Fragment to framebuffer writing.
-  * `fragmentOut[resolution] depthbuffer -> vec3[resolution] framebuffer`
+  * `FragmentOut[width][height] depthbuffer -> vec3[width][height] framebuffer`
   * Simply copies the colors out of the depth buffer into the framebuffer
     (to be displayed on the screen).
 
@@ -167,10 +168,11 @@ INSTRUCTOR TODO
 
 * Rasterization.
   * Scanline:
-    * Optimization: scissor around rasterized triangle
+    * Optimization: when rasterizing a triangle, only scan over the box around
+      the triangle (`getAABBForTriangle`).
 
 * Fragments to depth buffer.
-  * `fragmentOut[m] -> fragmentOut[resolution]`
+  * `fragmentOut[m] -> fragmentOut[width][height]`
   * Can really be done inside the fragment shader.
     * This allows you to do depth tests before spending execution time in
       complex fragment shader code.
