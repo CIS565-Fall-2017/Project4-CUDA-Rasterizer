@@ -34,7 +34,7 @@ obj::obj() {
 
 obj::~obj() {
     delete boundingbox;
-    for (int i = 0; i < faceboxes.size(); i++) {
+    for (int i = 0; i < (int) faceboxes.size(); i++) {
         delete faceboxes[i];
     }
 
@@ -48,10 +48,10 @@ void obj::buildBufPoss() {
     vector<int> BufIdxvec;
     int index = 0;
     bool genNormals = false;
-    if (faces.size() != facenormals.size()) {
+    if (faces.size() != (int) facenormals.size()) {
         genNormals = true;
     }
-    for (int k = 0; k < faces.size(); k++) {
+    for (int k = 0; k < (int) faces.size(); k++) {
 
         if (isConvex(faces[k]) == true) {
             //if(0==0){
@@ -59,7 +59,7 @@ void obj::buildBufPoss() {
 
             glm::vec4 p0 = points[face[0]];
 
-            for (int i = 2; i < face.size(); i++) {
+            for (int i = 2; i < (int) face.size(); i++) {
                 glm::vec4 p1 = points[face[i - 1]];
                 glm::vec4 p2 = points[face[i]];
                 BufPosvec.push_back(p0[0]) ;
@@ -114,13 +114,13 @@ void obj::buildBufPoss() {
     vbosize = (int)BufPosvec.size();
     nbosize = (int)BufNorvec.size();
     ibosize = (int)BufIdxvec.size();
-    for (int i = 0; i < BufPosvec.size(); i++) {
+    for (int i = 0; i < (int) BufPosvec.size(); i++) {
         vbo[i] = BufPosvec[i];
     }
-    for (int i = 0; i < BufNorvec.size(); i++) {
+    for (int i = 0; i < (int) BufNorvec.size(); i++) {
         nbo[i] = BufNorvec[i];
     }
-    for (int i = 0; i < BufIdxvec.size(); i++) {
+    for (int i = 0; i < (int) BufIdxvec.size(); i++) {
         ibo[i] = BufIdxvec[i];
     }
     setColor(glm::vec3(1, 1, 1));
@@ -202,7 +202,7 @@ bool obj::isConvex(vector<int> face) {
     glm::vec3 b = glm::vec3(points[face[0]][0], points[face[0]][1], points[face[0]][2]) - glm::vec3(points[face[1]][0], points[face[1]][1], points[face[1]][2]);
     glm::vec3 n = glm::normalize(glm::cross(a, b));
 
-    for (int i = 2; i < face.size(); i++) {
+    for (int i = 2; i < (int) face.size(); i++) {
         glm::vec3 c = glm::vec3(points[face[i - 1]][0], points[face[i - 1]][1], points[face[i - 1]][2]) - glm::vec3(points[face[i - 2]][0], points[face[i - 2]][1], points[face[i - 2]][2]);
         glm::vec3 d = glm::vec3(points[face[i - 1]][0], points[face[i - 1]][1], points[face[i - 1]][2]) - glm::vec3(points[face[i]][0], points[face[i]][1], points[face[i]][2]);
         glm::vec3 m = glm::normalize(glm::cross(c, d));
@@ -245,7 +245,7 @@ void obj::addFace(vector<int> face) {
     float facexmin = points[face[0]][0];
     float faceymin = points[face[0]][1];
     float facezmin = points[face[0]][2];
-    for (int i = 0; i < face.size(); i++) {
+    for (int i = 0; i < (int) face.size(); i++) {
         if (points[face[i]][0] > facexmax) {
             facexmax = points[face[i]][0];
         }
@@ -334,14 +334,14 @@ void obj::recenter() {
     zmax = points[0][2] - center[2];
     zmin = points[0][2] - center[2];
     top = 0;
-    for (int i = 0; i < points.size(); i++) {
+    for (int i = 0; i < (int) points.size(); i++) {
         points[i][0] = points[i][0] - center[0];
         points[i][1] = points[i][1] - center[1];
         points[i][2] = points[i][2] - center[2];
         compareMaxMin(points[i][0], points[i][1], points[i][2]);
     }
 
-    for (int i = 0; i < faceboxes.size(); i++) {
+    for (int i = 0; i < (int) faceboxes.size(); i++) {
 
         vector<int> face = faces[i];
 
@@ -352,7 +352,7 @@ void obj::recenter() {
         float faceymin = points[face[0]][1];
         float facezmin = points[face[0]][2];
 
-        for (int j = 0; j < face.size(); j++) {
+        for (int j = 0; j < (int) face.size(); j++) {
             if (points[face[j]][0] > facexmax) {
                 facexmax = points[face[j]][0];
             }

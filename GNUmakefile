@@ -6,16 +6,13 @@ CMAKE := $(shell \
 	([ -e ${CMAKE_ALT2} ] && echo "${CMAKE_ALT2}") \
 	)
 
-all: DebugFast
+all: RelWithDebInfo
 
 
 Debug: build
 	(cd build && ${CMAKE} -DCMAKE_BUILD_TYPE=$@ .. && make)
 
-DebugFast: build
-	(cd build && ${CMAKE} -DCMAKE_BUILD_TYPE=$@ .. && make)
-
-DebugNDEBUG: build
+RelWithDebInfo: build
 	(cd build && ${CMAKE} -DCMAKE_BUILD_TYPE=$@ .. && make)
 
 Release: build
@@ -31,4 +28,4 @@ build:
 clean:
 	((cd build && make clean) 2>&- || true)
 
-.PHONY: all Debug DebugFast DebugNDEBUG Release clean
+.PHONY: all Debug RelWithDebInfo Release clean

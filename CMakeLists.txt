@@ -22,11 +22,11 @@ list(APPEND CMAKE_LIBRARY_PATH "${EXTERNAL_LIB_PATH}")
 # Find up and set up core dependency libs
 
 set(GLFW_INCLUDE_DIR "external/include")
-set(GLFW_LIBRARY_DIR "${CMAKE_LIBRARY_PATH}")
+set(GLFW_LIBRARY_DIR "${EXTERNAL_LIB_PATH}")
 find_library(GLFW_LIBRARY "glfw3" HINTS "${GLFW_LIBRARY_DIR}")
 
 set(GLEW_INCLUDE_DIR "external/include")
-set(GLEW_LIBRARY_DIR "${CMAKE_LIBRARY_PATH}")
+set(GLEW_LIBRARY_DIR "${EXTERNAL_LIB_PATH}")
 add_definitions(-DGLEW_STATIC)
 find_package(GLEW)
 
@@ -42,25 +42,31 @@ set(CORELIBS
 set(CMAKE_CXX_STANDARD 11)
 
 # Set up different build configurations
-set(CMAKE_CONFIGURATION_TYPES Debug DebugNDEBUG Release)
+set(CMAKE_CONFIGURATION_TYPES Debug;RelWithDebInfo;Release
+    CACHE STRING "Set configuration types" FORCE)
 set(CUDA_PROPAGATE_HOST_FLAGS OFF)
-set(CMAKE_CXX_FLAGS_DEBUG       "-O0 -g")
-set(CMAKE_CXX_FLAGS_DEBUGNDEBUG "-O0 -g -DNDEBUG")
-set(CMAKE_CXX_FLAGS_DEBUGFAST   "-O2 -g")
-set(CMAKE_CXX_FLAGS_RELEASE     "-O3    -DNDEBUG")
-list(APPEND CUDA_NVCC_FLAGS_DEBUG       -O0 -g -G)
-list(APPEND CUDA_NVCC_FLAGS_DEBUGNDEBUG -O0 -g -G -DNDEBUG)
-list(APPEND CUDA_NVCC_FLAGS_DEBUGFAST   -O2 -g -lineinfo)
-list(APPEND CUDA_NVCC_FLAGS_RELEASE     -O3       -DNDEBUG)
+set(CMAKE_CXX_FLAGS_DEBUG                 "-O0 -g")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO        "-O2 -g")
+set(CMAKE_CXX_FLAGS_RELEASE               "-O3    -DNDEBUG")
+list(APPEND CUDA_NVCC_FLAGS_DEBUG          -O0 -g -G)
+list(APPEND CUDA_NVCC_FLAGS_RELWITHDEBINFO -O2 -g -lineinfo)
+list(APPEND CUDA_NVCC_FLAGS_RELEASE        -O3    -DNDEBUG)
+if (WIN32)
+    set(CUDA_PROPAGATE_HOST_FLAGS ON)
+    set(CMAKE_CXX_FLAGS                       "/MD /EHsc /D _CRT_SECURE_NO_WARNINGS")
+    set(CMAKE_CXX_FLAGS_DEBUG                 "/Od /Zi")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO        "/O2 /Zi")
+    set(CMAKE_CXX_FLAGS_RELEASE               "/O2 /D NDEBUG")
+endif()
 
-# OS X linker options
+# OS X options
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     list(APPEND CORELIBS "-framework IOKit")
     list(APPEND CORELIBS "-framework Cocoa")
     list(APPEND CORELIBS "-framework CoreVideo")
 endif()
 
-# Linux linker options
+# Linux options
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     list(APPEND CMAKE_EXE_LINKER_FLAGS "-lX11 -lXxf86vm -lXrandr -lXi")
 endif()

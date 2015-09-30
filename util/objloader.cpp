@@ -74,11 +74,11 @@ objLoader::objLoader(string filename, obj *newMesh) {
                         istringstream facestring(v);
                         string f;
                         getline(facestring, f, '/');
-                        pointList.push_back(::atof(f.c_str()) - 1);
+                        pointList.push_back(::atoi(f.c_str()) - 1);
 
                         getline(facestring, f, '/');
                         getline(facestring, f, ' ');
-                        normalList.push_back(::atof(f.c_str()) - 1);
+                        normalList.push_back(::atoi(f.c_str()) - 1);
 
                     }
                     geomesh->addFace(pointList);
@@ -93,11 +93,11 @@ objLoader::objLoader(string filename, obj *newMesh) {
                         int i = 0;
                         while (getline(facestring, f, '/')) {
                             if (i == 0) {
-                                pointList.push_back(::atof(f.c_str()) - 1);
+                                pointList.push_back(::atoi(f.c_str()) - 1);
                             } else if (i == 1) {
-                                texturecoordList.push_back(::atof(f.c_str()) - 1);
+                                texturecoordList.push_back(::atoi(f.c_str()) - 1);
                             } else if (i == 2) {
-                                normalList.push_back(::atof(f.c_str()) - 1);
+                                normalList.push_back(::atoi(f.c_str()) - 1);
                             }
                             i++;
                         }
@@ -109,7 +109,7 @@ objLoader::objLoader(string filename, obj *newMesh) {
                     string v;
                     vector<int> pointList;
                     while (getline(liness, v, ' ')) {
-                        pointList.push_back(::atof(v.c_str()) - 1);
+                        pointList.push_back(::atoi(v.c_str()) - 1);
                     }
                     geomesh->addFace(pointList);
                     //std::cout << "Vertex Format" << std::endl;
