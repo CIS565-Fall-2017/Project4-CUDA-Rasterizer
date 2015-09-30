@@ -130,6 +130,27 @@ For each extra feature, please provide the following brief analysis:
 * How might this feature be optimized beyond your current implementation?
 
 
+## Base Code Tour
+
+You will be working primarily in two files: `rasterize.cu`, and
+`rasterizeTools.h`. Within these files, areas that you need to complete are
+marked with a `TODO` comment. Areas that are useful to and serve as hints for
+optional features are marked with `TODO (Optional)`. Functions that are useful
+for reference are marked with the comment `CHECKITOUT`. **You should look at
+all TODOs and CHECKITOUTs before starting!** There are not many.
+
+* `src/rasterize.cu` contains the core rasterization pipeline. 
+  * A few pre-made structs are included for you to use, but those marked with
+    TODO will also be needed for a simple rasterizer. As with any part of the
+    base code, you may modify or replace these as you see fit.
+
+* `src/rasterizeTools.h` contains various useful tools
+  * Includes a number of barycentric coordinate related functions that you may
+    find useful in implementing scanline based rasterization.
+
+* `util/utilityCore.hpp` serves as a kitchen-sink of useful functions.
+
+
 ## Rasterization Pipeline
 
 Possible pipelines are described below. Pseudo-type-signatures are given.
@@ -139,8 +160,9 @@ Not all of the pseudocode arrays will necessarily actually exist in practice.
 
 This describes a minimal version of *one possible* graphics pipeline, similar
 to modern hardware (DX/OpenGL). Yours need not match precisely.  To begin, try
-to write a minimal amount of code as described here. This will reduce the
-necessary time spent debugging.
+to write a minimal amount of code as described here. Verify some output after
+implementing each pipeline step. This will reduce the necessary time spent
+debugging.
 
 Start out by testing a single triangle (`tri.obj`).
 
@@ -222,30 +244,7 @@ choose any sequence that works.  Please document in your README what sequence
 you choose and why.
 
 
-## Base Code Tour
-
-You will be working primarily in two files: `rasterize.cu`, and
-`rasterizeTools.h`. Within these files, areas that you need to complete are
-marked with a `TODO` comment. Areas that are useful to and serve as hints for
-optional features are marked with `TODO (Optional)`. Functions that are useful
-for reference are marked with the comment `CHECKITOUT`. **You should look at
-all TODOs and CHECKITOUTs before starting!** There are not many.
-
-* `src/rasterize.cu` contains the core rasterization pipeline. 
-  * A few pre-made structs are included for you to use, but those marked with
-    TODO will also be needed for a simple rasterizer. As with any part of the
-    base code, you may modify or replace these as you see fit.
-
-* `src/rasterizeTools.h` contains various useful tools
-  * Includes a number of barycentric coordinate related functions that you may
-    find useful in implementing scanline based rasterization.
-
-* `util/utilityCore.h` serves as a kitchen-sink of useful functions.
-
-
 ## Resources
-
-**INSTRUCTOR TODO:** make sure these links work
 
 The following resources may be useful for this project:
 

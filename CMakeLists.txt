@@ -76,7 +76,7 @@ add_subdirectory(src)
 add_subdirectory(util)
 
 cuda_add_executable(${CMAKE_PROJECT_NAME}
-    "src/main.h"
+    "src/main.hpp"
     "src/main.cpp"
     )
 

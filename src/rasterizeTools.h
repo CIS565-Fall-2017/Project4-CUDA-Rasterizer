@@ -1,7 +1,7 @@
 /**
  * @file      rasterizeTools.h
- * @brief     Tools/utility functions for 
- * @authors   Yining Karl Li, Kai Ninomiya
+ * @brief     Tools/utility functions for rasterization.
+ * @authors   Yining Karl Li
  * @date      2012-2015
  * @copyright University of Pennsylvania
  */

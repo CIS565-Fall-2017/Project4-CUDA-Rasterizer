@@ -1,3 +1,11 @@
+/**
+ * @file      rasterize.h
+ * @brief     CUDA-accelerated rasterization pipeline.
+ * @authors   Skeleton code: Yining Karl Li, Kai Ninomiya
+ * @date      2012-2015
+ * @copyright University of Pennsylvania & STUDENT
+ */
+
 #pragma once
 
 #include <glm/glm.hpp>
