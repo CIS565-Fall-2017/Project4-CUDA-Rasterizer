@@ -15,7 +15,7 @@ project, and we will not be able to grade you without a good README.
 Instructions (delete me)
 ========================
 
-This is due **INSTRUCTOR TODO** evening at midnight.
+This is due Sunday, October 11, evening at midnight.
 
 **Summary:** 
 In this project, you will use CUDA to implement a simplified
@@ -67,9 +67,9 @@ the console for errors.
 
 **Ask on the mailing list for any clarifications.**
 
-In this project, you are given code for:
+In this project, you are given the following code:
 
-* A library for loading/reading standard Alias/Wavefront `.obj` format mesh
+* A library for loading standard Alias/Wavefront `.obj` format mesh
   files and converting them to OpenGL-style buffers of index and vertex data.
   * This library does NOT read materials, and provides all colors as white by
     default. You can use another library if you wish.
@@ -83,8 +83,7 @@ You will need to implement the following features/pipeline stages:
 * (Vertex shader) perspective transformation.
 * Primitive assembly with support for triangles read from buffers of index and
   vertex data.
-* Rasterization: **either** a scanline or a tile-based approach.
-  * (Tile-based rasterization is an extra feature.)
+* Rasterization.
 * Fragment shading.
 * A depth buffer for storing and depth testing fragments.
 * Fragment to depth buffer writing (**with** atomics for race avoidance).
@@ -95,7 +94,7 @@ See below for more guidance.
 You are also required to implement at least "3.0" points in extra features.
 (the parenthesized numbers must add to 3.0 or more):
 
-* (1.0) Tile-based rasterization method instead of scanline.
+* (1.0) Tile-based pipeline.
 * Additional pipeline stages.
    * (1.0) Tessellation shader.
    * (1.0) Geometry shader, able to output a variable number of primitives per
@@ -104,7 +103,7 @@ You are also required to implement at least "3.0" points in extra features.
      stream compaction (thrust allowed).
    * (1.0) Transform feedback.
    * (0.5) Scissor test.
-   * (0.5) Blending (when saving into depth buffer).
+   * (0.5) Blending (when writing into framebuffer).
 * (1.0) Instancing: draw one set of vertex data multiple times, each run
   through the vertex shader with a different ID.
 * (0.5) Correct color interpolation between points on a primitive.
