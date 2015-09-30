@@ -17,8 +17,7 @@ Instructions (delete me)
 
 This is due **INSTRUCTOR TODO** evening at midnight.
 
-**Summary:** **INSTRUCTOR TODO**
-
+**Summary:** 
 In this project, you will use CUDA to implement a simplified
 rasterized graphics pipeline, similar to the OpenGL pipeline. You will
 implement vertex shading, primitive assembly, rasterization, fragment shading,
@@ -41,8 +40,6 @@ bunch of them around so you can pick a few to document your progress.
 
 ### Contents
 
-**INSTRUCTOR TODO:** update according to any code changes. ADD SPONZA.
-
 * `src/` C++/CUDA source files.
 * `util/` C++ utility files.
 * `objs/` Example OBJ test files:
@@ -52,8 +49,7 @@ bunch of them around so you can pick a few to document your progress.
   * `cow.obj` (4583 verts, 5804 tris): A large model with low depth-complexity.
   * `flower.obj` (640 verts, 640 tris): A medium model with very high depth-complexity.
   * `sponza.obj` (153,635 verts, 279,163 tris): A huge model with very high depth-complexity.
-* `img/` Renders of example OBJs.
-  (These probably won't match precisely with yours.)
+* `renders/` Debug render of an example OBJ.
 * `external/` Includes and static libraries for 3rd party libraries.
 
 ### Running the code
@@ -74,7 +70,7 @@ the console for errors.
 In this project, you are given code for:
 
 * A library for loading/reading standard Alias/Wavefront `.obj` format mesh
-  files and converting them to OpenGL-style vertex and index buffers.
+  files and converting them to OpenGL-style buffers of index and vertex data.
   * This library does NOT read materials, and provides all colors as white by
     default. You can use another library if you wish.
 * Simple structs for some parts of the pipeline.
@@ -85,8 +81,10 @@ You will need to implement the following features/pipeline stages:
 
 * Vertex shading.
 * (Vertex shader) perspective transformation.
-* Primitive assembly with support for triangle vertex and index buffers.
-* Rasterization: **either** a scanline or a tiled approach.
+* Primitive assembly with support for triangles read from buffers of index and
+  vertex data.
+* Rasterization: **either** a scanline or a tile-based approach.
+  * (Tile-based rasterization is an extra feature.)
 * Fragment shading.
 * A depth buffer for storing and depth testing fragments.
 * Fragment to depth buffer writing (**with** atomics for race avoidance).
@@ -94,48 +92,50 @@ You will need to implement the following features/pipeline stages:
 
 See below for more guidance.
 
-You are also required to implement at least "3.0" of the following features.
+You are also required to implement at least "3.0" points in extra features.
 (the parenthesized numbers must add to 3.0 or more):
 
+* (1.0) Tile-based rasterization method instead of scanline.
 * Additional pipeline stages.
    * (1.0) Tessellation shader.
-   * (1.0) Geometry shader.
+   * (1.0) Geometry shader, able to output a variable number of primitives per
+     input primitive, optimized using stream compaction (thrust allowed).
+   * (0.5 **if not doing geometry shader**) Backface culling, optimized using
+     stream compaction (thrust allowed).
    * (1.0) Transform feedback.
-   * (0.5) Back-face culling with stream compaction.
    * (0.5) Scissor test.
-   * (0.5) Blending.
-* (1.0) Instancing
+   * (0.5) Blending (when saving into depth buffer).
+* (1.0) Instancing: draw one set of vertex data multiple times, each run
+  through the vertex shader with a different ID.
 * (0.5) Correct color interpolation between points on a primitive.
-* (1.0) UV texture mapping with bilinear texture filtering and perspective correct texture coordinates.
+* (1.0) UV texture mapping with bilinear texture filtering and perspective
+  correct texture coordinates.
 * Support for rasterizing additional primitives:
    * (0.5) Lines or line strips.
    * (0.5) Points.
-* (1.0) Anti-aliasing
-* (1.0) Occlusion queries
-* (1.0) Order-independent translucency using a k-buffer
+* (1.0) Anti-aliasing.
+* (1.0) Occlusion queries.
+* (1.0) Order-independent translucency using a k-buffer.
 * (0.5) **Mouse**-based interactive camera support.
 
 This extra feature list is not comprehensive. If you have a particular idea
 you would like to implement, please **contact us first**.
 
 **IMPORTANT:**
-For each extra feature, please provide the following analysis:
+For each extra feature, please provide the following brief analysis:
 
 * Concise overview write-up of the feature.
-* Performance impact of adding the feature.
+* Performance impact of adding the feature (slower or faster).
 * If you did something to accelerate the feature, what did you do and why?
 * How might this feature be optimized beyond your current implementation?
 
 
 ## Rasterization Pipeline
 
-**INSTRUCTOR TODO**: update README to explain a minimal pipeline to see a
-triangle, e.g., no depth test, draw in NDC, etc.
-
 Possible pipelines are described below. Pseudo-type-signatures are given.
 Not all of the pseudocode arrays will necessarily actually exist in practice.
 
-### Minimal Pipeline
+### First-Try Pipeline
 
 This describes a minimal version of *one possible* graphics pipeline, similar
 to modern hardware (DX/OpenGL). Yours need not match precisely.  To begin, try
@@ -174,7 +174,7 @@ Start out by testing a single triangle (`tri.obj`).
   * Simply copies the colors out of the depth buffer into the framebuffer
     (to be displayed on the screen).
 
-### Better Pipeline
+### A Useful Pipeline
 
 * Clear the depth buffer with some default value.
 * Vertex shading: 
@@ -188,7 +188,7 @@ Start out by testing a single triangle (`tri.obj`).
   * `Triangle[n/3] primitives -> FragmentIn[m] fs_input`
   * You may choose to do a tiled rasterization method, which should have lower
     global memory bandwidth.
-  * Scanline optimization: when rasterizing a triangle, only scan over the
+  * A scanline optimization: when rasterizing a triangle, only scan over the
     box around the triangle (`getAABBForTriangle`).
 * Fragment shading.
   * `FragmentIn[m] fs_input -> FragmentOut[m] fs_output`
@@ -203,6 +203,7 @@ Start out by testing a single triangle (`tri.obj`).
     same fragment in the depth buffer, depth buffer locations must be locked
     while comparing the old and new fragment depths and (possibly) writing into
     it.
+    * The `flower.obj` test file is good for testing race conditions.
 * A depth buffer for storing and depth testing fragments.
   * `FragmentOut[width][height] depthbuffer`
   * An array of `fragment` objects.
@@ -219,6 +220,7 @@ and primitive assembly kernels, or merge the perspective transform into another
 kernel. There is not necessarily a right sequence of kernels, and you may
 choose any sequence that works.  Please document in your README what sequence
 you choose and why.
+
 
 ## Base Code Tour
 
@@ -305,11 +307,13 @@ negative effects on performance.
 We encourage you to get creative with your tweaks. Consider places in your code
 that could be considered bottlenecks and try to improve them. 
 
-Provide no more than a one page summary of your optimizations along with tables
-and or graphs to visually explain any performance differences.
+Provide summary of your optimizations (no more than one page), along with
+tables and or graphs to visually explain any performance differences.
 
-**INSTRUCTOR TODO**: require stage-by-stage performance analysis like this -
-https://github.com/takfuruya/Project4-Rasterizer
+* Include a breakdown of time spent in each pipeline stage for a few different
+  models. It is suggested that you use pie charts or 100% stacked bar charts.
+* For optimization steps (like backface culling), include a performance
+  comparison to show the effectiveness.
 
 
 ## Submit
