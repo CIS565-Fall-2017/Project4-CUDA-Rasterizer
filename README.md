@@ -250,28 +250,25 @@ all TODOs and CHECKITOUTs before starting!** There are not many.
 The following resources may be useful for this project:
 
 * High-Performance Software Rasterization on GPUs:
-  * Paper (HPG 2011):
-    http://www.tml.tkk.fi/~samuli/publications/laine2011hpg_paper.pdf
-  * Code: http://code.google.com/p/cudaraster/
+  * [Paper (HPG 2011)](http://www.tml.tkk.fi/~samuli/publications/laine2011hpg_paper.pdf)
+  * [Code](http://code.google.com/p/cudaraster/)
   * Note that looking over this code for reference with regard to the paper is
     fine, but we most likely will not grant any requests to actually
     incorporate any of this code into your project.
-  * Slides:
-    http://bps11.idav.ucdavis.edu/talks/08-gpuSoftwareRasterLaineAndPantaleoni-BPS2011.pdf
+  * [Slides](http://bps11.idav.ucdavis.edu/talks/08-gpuSoftwareRasterLaineAndPantaleoni-BPS2011.pdf)
 * The Direct3D 10 System (SIGGRAPH 2006) - for those interested in doing
   geometry shaders and transform feedback:
-  * http://133.11.9.3/~takeo/course/2006/media/papers/Direct3D10_siggraph2006.pdf
+  * [Paper](http://dl.acm.org/citation.cfm?id=1141947)
+  * [Paper, through Penn Libraries proxy](http://proxy.library.upenn.edu:2247/citation.cfm?id=1141947)
 * Multi-Fragment Eﬀects on the GPU using the k-Buﬀer - for those who want to do
   order-independent transparency using a k-buffer:
-  * http://www.inf.ufrgs.br/~comba/papers/2007/kbuffer_preprint.pdf
+  * [Paper](http://www.inf.ufrgs.br/~comba/papers/2007/kbuffer_preprint.pdf)
 * FreePipe: A Programmable, Parallel Rendering Architecture for Efficient
   Multi-Fragment Effects (I3D 2010):
-  * https://sites.google.com/site/hmcen0921/cudarasterizer
+  * [Paper](https://sites.google.com/site/hmcen0921/cudarasterizer)
 * Writing A Software Rasterizer In Javascript:
-  * Part 1:
-    http://simonstechblog.blogspot.com/2012/04/software-rasterizer-part-1.html
-  * Part 2:
-    http://simonstechblog.blogspot.com/2012/04/software-rasterizer-part-2.html
+  * [Part 1](http://simonstechblog.blogspot.com/2012/04/software-rasterizer-part-1.html)
+  * [Part 2](http://simonstechblog.blogspot.com/2012/04/software-rasterizer-part-2.html)
 
 
 ## Third-Party Code Policy
