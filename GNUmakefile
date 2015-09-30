@@ -15,6 +15,9 @@ Debug: build
 DebugFast: build
 	(cd build && ${CMAKE} -DCMAKE_BUILD_TYPE=$@ .. && make)
 
+DebugNDEBUG: build
+	(cd build && ${CMAKE} -DCMAKE_BUILD_TYPE=$@ .. && make)
+
 Release: build
 	(cd build && ${CMAKE} -DCMAKE_BUILD_TYPE=$@ .. && make)
 
@@ -28,4 +31,4 @@ build:
 clean:
 	((cd build && make clean) 2>&- || true)
 
-.PHONY: all Debug DebugFast Release clean
+.PHONY: all Debug DebugFast DebugNDEBUG Release clean
