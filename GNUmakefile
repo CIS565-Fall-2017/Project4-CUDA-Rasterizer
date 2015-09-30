@@ -23,7 +23,7 @@ Release: build
 
 
 run:
-	build/cis565_path_tracer scenes/sphere.txt
+	build/cis565_rasterizer objs/tri.obj
 
 build:
 	mkdir -p build

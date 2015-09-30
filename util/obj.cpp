@@ -415,7 +415,6 @@ void obj::setColor(glm::vec3 newColor) {
         cbo[j + 0] = newColor[0];
         cbo[j + 1] = newColor[1];
         cbo[j + 2] = newColor[2];
-        //cbo[j+0] = newColor[0]; cbo[j+1] = newColor[1]; cbo[j+2] = newColor[2];
     }
     defaultColor = newColor;
 }

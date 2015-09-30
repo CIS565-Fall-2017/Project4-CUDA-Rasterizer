@@ -45,7 +45,13 @@ bunch of them around so you can pick a few to document your progress.
 
 * `src/` C++/CUDA source files.
 * `util/` C++ utility files.
-* `objs/` Example OBJ test files: `tri.obj`, `cube.obj`, `cow.obj`, `sponza.obj`.
+* `objs/` Example OBJ test files:
+  * `tri.obj` (3 verts, 1 tri): The simplest possible geometric object.
+  * `cube.obj` (8 verts, 12 tris): A small model with low depth-complexity.
+  * `suzanne.obj` (507 verts, 968 tris): A medium model with low depth-complexity.
+  * `cow.obj` (4583 verts, 5804 tris): A large model with low depth-complexity.
+  * `flower.obj` (640 verts, 640 tris): A medium model with very high depth-complexity.
+  * `sponza.obj` (153,635 verts, 279,163 tris): A huge model with very high depth-complexity.
 * `img/` Renders of example OBJs.
   (These probably won't match precisely with yours.)
 * `external/` Includes and static libraries for 3rd party libraries.
@@ -68,9 +74,12 @@ the console for errors.
 In this project, you are given code for:
 
 * A library for loading/reading standard Alias/Wavefront `.obj` format mesh
-  files and converting them to OpenGL-style vertex and index buffers
-* A suggested order of kernels with which to implement the graphics pipeline
-* CUDA-GL interop
+  files and converting them to OpenGL-style vertex and index buffers.
+  * This library does NOT read materials, and provides all colors as white by
+    default. You can use another library if you wish.
+* Simple structs for some parts of the pipeline.
+* Depth buffer to framebuffer copy.
+* CUDA-GL interop.
 
 You will need to implement the following features/pipeline stages:
 
@@ -128,10 +137,12 @@ Not all of the pseudocode arrays will necessarily actually exist in practice.
 
 ### Minimal Pipeline
 
-This describes a minimal version *one possible* graphics pipeline, similar to
-modern hardware (DX/OpenGL). Yours need not match precisely.  To begin, try to
-write a minimal amount of code as described here. This will reduce the
+This describes a minimal version of *one possible* graphics pipeline, similar
+to modern hardware (DX/OpenGL). Yours need not match precisely.  To begin, try
+to write a minimal amount of code as described here. This will reduce the
 necessary time spent debugging.
+
+Start out by testing a single triangle (`tri.obj`).
 
 * Clear the depth buffer with some default value.
 * Vertex shading: 
@@ -140,19 +151,20 @@ necessary time spent debugging.
     directly in normalized device coordinates (-1 to 1 in each dimension).
 * Primitive assembly.
   * `VertexOut[n] vs_output -> Triangle[n/3] primitives`
-  * Start by supporting ONLY triangles.
+  * Start by supporting ONLY triangles. For a triangle defined by indices
+    `(a, b, c)` into `VertexOut` array `vo`, simply copy the appropriate values
+    into a `Triangle` object `(vo[a], vo[b], vo[c])`.
 * Rasterization.
   * `Triangle[n/3] primitives -> FragmentIn[m] fs_input`
-  * Scanline: TODO
-  * Tiled: TODO
+  * A scanline implementation is simpler to start with.
 * Fragment shading.
   * `FragmentIn[m] fs_input -> FragmentOut[m] fs_output`
   * A super-simple test fragment shader: output same color for every fragment.
     * Also try displaying various debug views (normals, etc.)
 * Fragments to depth buffer.
   * `FragmentOut[m] -> FragmentOut[width][height]`
-  * Can really be done inside the fragment shader.
   * Results in race conditions - don't bother to fix these until it works!
+  * Can really be done inside the fragment shader.
 * A depth buffer for storing and depth testing fragments.
   * `FragmentOut[width][height] depthbuffer`
   * An array of `fragment` objects.
@@ -164,67 +176,69 @@ necessary time spent debugging.
 
 ### Better Pipeline
 
-INSTRUCTOR TODO
-
+* Clear the depth buffer with some default value.
+* Vertex shading: 
+  * `VertexIn[n] vs_input -> VertexOut[n] vs_output`
+  * Apply some vertex transformation (e.g. model-view-projection matrix).
+* Primitive assembly.
+  * `VertexOut[n] vs_output -> Triangle[n/3] primitives`
+  * As above.
+  * Other primitive types are optional.
 * Rasterization.
-  * Scanline:
-    * Optimization: when rasterizing a triangle, only scan over the box around
-      the triangle (`getAABBForTriangle`).
-
+  * `Triangle[n/3] primitives -> FragmentIn[m] fs_input`
+  * You may choose to do a tiled rasterization method, which should have lower
+    global memory bandwidth.
+  * Scanline optimization: when rasterizing a triangle, only scan over the
+    box around the triangle (`getAABBForTriangle`).
+* Fragment shading.
+  * `FragmentIn[m] fs_input -> FragmentOut[m] fs_output`
+  * Add a shading method, such as Lambert or Blinn-Phong. Lights can be defined
+    by kernel parameters (like GLSL uniforms).
 * Fragments to depth buffer.
-  * `fragmentOut[m] -> fragmentOut[width][height]`
+  * `FragmentOut[m] -> FragmentOut[width][height]`
   * Can really be done inside the fragment shader.
-    * This allows you to do depth tests before spending execution time in
-      complex fragment shader code.
-  * When writing to the depth buffer, you will need to use atomics for race
-    avoidance, to prevent different primitives from overwriting each other in
-    the wrong order.
+    * An optimization: this allows you to do depth tests before spending
+      execution time in complex fragment shader code!
+  * Handle race conditions! Since multiple primitives write fragments to the
+    same fragment in the depth buffer, depth buffer locations must be locked
+    while comparing the old and new fragment depths and (possibly) writing into
+    it.
+* A depth buffer for storing and depth testing fragments.
+  * `FragmentOut[width][height] depthbuffer`
+  * An array of `fragment` objects.
+  * At the end of a frame, it should contain the fragments drawn to the screen.
+* Fragment to framebuffer writing.
+  * `FragmentOut[width][height] depthbuffer -> vec3[width][height] framebuffer`
+  * Simply copies the colors out of the depth buffer into the framebuffer
+    (to be displayed on the screen).
 
+This is a suggested sequence of pipeline steps, but you may choose to alter the
+order of this sequence or merge entire kernels as you see fit.  For example, if
+you decide that doing has benefits, you can choose to merge the vertex shader
+and primitive assembly kernels, or merge the perspective transform into another
+kernel. There is not necessarily a right sequence of kernels, and you may
+choose any sequence that works.  Please document in your README what sequence
+you choose and why.
 
 ## Base Code Tour
-
-**INSTRUCTOR TODO:** update according to any code changes.
-TODO: simple structs for every part of the pipeline, intended to be changed?
-(e.g. vertexPre, vertexPost, triangle = vertexPre[3], fragment).
-TODO: autoformat code
-TODO: pragma once
-TODO: doxygen
 
 You will be working primarily in two files: `rasterize.cu`, and
 `rasterizeTools.h`. Within these files, areas that you need to complete are
 marked with a `TODO` comment. Areas that are useful to and serve as hints for
 optional features are marked with `TODO (Optional)`. Functions that are useful
-for reference are marked with the comment `CHECKITOUT`.
+for reference are marked with the comment `CHECKITOUT`. **You should look at
+all TODOs and CHECKITOUTs before starting!** There are not many.
 
 * `src/rasterize.cu` contains the core rasterization pipeline. 
-  * A suggested sequence of kernels exists in this file, but you may choose to
-    alter the order of this sequence or merge entire kernels if you see fit.
-    For example, if you decide that doing has benefits, you can choose to merge
-    the vertex shader and primitive assembly kernels, or merge the perspective
-    transform into another kernel. There is not necessarily a right sequence of
-    kernels (although there are wrong sequences, such as placing fragment
-    shading before vertex shading), and you may choose any sequence you want.
-    Please document in your README what sequence you choose and why.
-  * The provided kernels have had their input parameters removed beyond basic
-    inputs such as the framebuffer. You will have to decide what inputs should
-    go into each stage of the pipeline, and what outputs there should be. 
+  * A few pre-made structs are included for you to use, but those marked with
+    TODO will also be needed for a simple rasterizer. As with any part of the
+    base code, you may modify or replace these as you see fit.
 
-* `src/rasterizeTools.h` contains various useful tools, including a number of
-  barycentric coordinate related functions that you may find useful in
-  implementing scanline based rasterization...
-  * A few pre-made structs are included for you to use, such as fragment and
-    triangle. A simple rasterizer can be implemented with these structs as is.
-    However, as with any part of the basecode, you may choose to modify, add
-    to, use as-is, or outright ignore them as you see fit.
-  * If you do choose to add to the fragment struct, be sure to include in your
-    README a rationale for why. 
+* `src/rasterizeTools.h` contains various useful tools
+  * Includes a number of barycentric coordinate related functions that you may
+    find useful in implementing scanline based rasterization.
 
-You will also want to familiarize yourself with:
-
-* `src/main.cpp`, which contains code that transfers VBOs/CBOs/IBOs to the
-  rasterization pipeline. Interactive camera work will also involve this file
-  if you choose that feature.
-* `util/utilityCore.h`, which serves as a kitchen-sink of useful functions
+* `util/utilityCore.h` serves as a kitchen-sink of useful functions.
 
 
 ## Resources

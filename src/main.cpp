@@ -1,6 +1,3 @@
-// CIS565 CUDA Rasterizer: A simple rasterization pipeline for Patrick Cozzi's CIS565: GPU Computing at the University of Pennsylvania
-// Written by Yining Karl Li, Copyright (c) 2012 University of Pennsylvania
-
 #include "main.h"
 
 //-------------------------------
@@ -8,17 +5,16 @@
 //-------------------------------
 
 int main(int argc, char **argv) {
-    obj *mesh = NULL;
-    for (int i = 1; i < argc; i++) {
-        mesh = new obj();
-        objLoader *loader = new objLoader(argv[i], mesh);
-        mesh->buildBufPoss();
-        delete loader;
-    }
-
-    if (mesh == NULL) {
+    if (argc != 2) {
         cout << "Usage: [obj file]" << endl;
         return 0;
+    }
+
+    obj *mesh = new obj();
+
+    {
+        objLoader loader(argv[1], mesh);
+        mesh->buildBufPoss();
     }
 
     frame = 0;
@@ -120,9 +116,9 @@ bool init(obj *mesh) {
         0.0, 0.0, 1.0,
         1.0, 0.0, 0.0
     };
-    rasterizeSet(mesh->getBufIdxsize(), mesh->getBufIdx(),
-            mesh->getBufPossize(),
-            mesh->getBufPos(), mesh->getBufNor(), mesh->getBufCol());
+    rasterizeSetBuffers(mesh->getBufIdxsize(), mesh->getBufIdx(),
+            mesh->getBufPossize() / 3,
+            mesh->getBufPos(), mesh->getBufNor(), mesh->getBufTex());
 
     GLuint passthroughProgram;
     passthroughProgram = initShader();

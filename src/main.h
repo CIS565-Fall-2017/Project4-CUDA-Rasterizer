@@ -1,8 +1,4 @@
-// CIS565 CUDA Rasterizer: A simple rasterization pipeline for Patrick Cozzi's CIS565: GPU Computing at the University of Pennsylvania
-// Written by Yining Karl Li, Copyright (c) 2012 University of Pennsylvania
-
-#ifndef MAIN_H
-#define MAIN_H
+#pragma once
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -89,5 +85,3 @@ void deleteTexture(GLuint *tex);
 void mainLoop();
 void errorCallback(int error, const char *description);
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
-
-#endif

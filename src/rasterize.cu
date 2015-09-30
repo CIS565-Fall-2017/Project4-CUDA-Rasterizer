@@ -11,17 +11,16 @@ struct VertexIn {
     glm::vec3 pos;
     glm::vec3 nor;
     glm::vec3 col;
-    // TODO
+    // TODO (optional) add other vertex attributes (e.g. texture coordinates)
 };
 struct VertexOut {
     // TODO
 };
 struct Triangle {
-    // TODO
+    VertexOut v[3];
 };
 struct Fragment {
     glm::vec3 color;
-    // TODO
 };
 
 static int width = 0;
@@ -75,36 +74,61 @@ void rasterizeInit(int w, int h) {
     width = w;
     height = h;
     cudaFree(dev_depthbuffer);
-    cudaFree(dev_framebuffer);
     cudaMalloc(&dev_depthbuffer,   width * height * sizeof(Fragment));
     cudaMemset(dev_depthbuffer, 0, width * height * sizeof(Fragment));
+    cudaFree(dev_framebuffer);
     cudaMalloc(&dev_framebuffer,   width * height * sizeof(glm::vec3));
     cudaMemset(dev_framebuffer, 0, width * height * sizeof(glm::vec3));
     checkCUDAError("rasterizeInit");
 }
 
-void rasterizeSet(
+/**
+ * Set all of the buffers necessary for rasterization.
+ */
+void rasterizeSetBuffers(
         int _bufIdxSize, int *bufIdx,
         int _vertCount, float *bufPos, float *bufNor, float *bufCol) {
     bufIdxSize = _bufIdxSize;
     vertCount = _vertCount;
+
     cudaFree(dev_bufIdx);
-    cudaFree(dev_bufVertex);
-    cudaFree(dev_primitives);
     cudaMalloc(&dev_bufIdx, bufIdxSize * sizeof(int));
+    cudaMemcpy(dev_bufIdx, bufIdx, bufIdxSize * sizeof(int), cudaMemcpyHostToDevice);
+
+    VertexIn *bufVertex = new VertexIn[_vertCount];
+    for (int i = 0; i < vertCount; i++) {
+        int j = i * 3;
+        bufVertex[i].pos = glm::vec3(bufPos[j + 0], bufPos[j + 1], bufPos[j + 2]);
+        bufVertex[i].nor = glm::vec3(bufNor[j + 0], bufNor[j + 1], bufNor[j + 2]);
+        bufVertex[i].col = glm::vec3(bufCol[j + 0], bufCol[j + 1], bufCol[j + 2]);
+    }
+    cudaFree(dev_bufVertex);
     cudaMalloc(&dev_bufVertex, vertCount * sizeof(VertexIn));
+    cudaMemcpy(dev_bufVertex, bufVertex, vertCount * sizeof(VertexIn), cudaMemcpyHostToDevice);
+
+    cudaFree(dev_primitives);
     cudaMalloc(&dev_primitives, vertCount / 3 * sizeof(Triangle));
-    checkCUDAError("rasterizeSet");
+    cudaMemset(dev_primitives, 0, vertCount / 3 * sizeof(Triangle));
+
+    checkCUDAError("rasterizeSetBuffers");
 }
 
+/**
+ * Perform rasterization.
+ */
 void rasterize(uchar4 *pbo) {
-    int tileSize = 8;
-    dim3 threadsPerBlock(tileSize, tileSize);
-    dim3 fullBlocksPerGrid((int)ceil(float(width)/float(tileSize)), (int)ceil(float(height)/float(tileSize)));
+    int sideLength2d = 8;
+    dim3 blockSize2d(sideLength2d, sideLength2d);
+    dim3 blockCount2d((width  - 1) / blockSize2d.x + 1,
+                      (height - 1) / blockSize2d.y + 1);
 
-    // TODO
+    // TODO: Execute your rasterization pipeline here
+    // (See README for rasterization pipeline outline.)
 
-    sendImageToPBO<<<fullBlocksPerGrid, threadsPerBlock>>>(pbo, width, height, dev_framebuffer);
+    // Copy depthbuffer colors into framebuffer
+    render<<<blockCount2d, blockSize2d>>>(width, height, dev_depthbuffer, dev_framebuffer);
+    // Copy framebuffer into OpenGL buffer for OpenGL previewing
+    sendImageToPBO<<<blockCount2d, blockSize2d>>>(pbo, width, height, dev_framebuffer);
     checkCUDAError("rasterize");
 }
 
@@ -112,15 +136,20 @@ void rasterize(uchar4 *pbo) {
  * Called once at the end of the program to free CUDA memory.
  */
 void rasterizeFree() {
-    cudaFree(dev_bufVertex);
     cudaFree(dev_bufIdx);
-    cudaFree(dev_primitives);
-    cudaFree(dev_depthbuffer);
-    cudaFree(dev_framebuffer);
-    dev_primitives = NULL;
-    dev_bufVertex = NULL;
     dev_bufIdx = NULL;
-    dev_framebuffer = NULL;
+
+    cudaFree(dev_bufVertex);
+    dev_bufVertex = NULL;
+
+    cudaFree(dev_primitives);
+    dev_primitives = NULL;
+
+    cudaFree(dev_depthbuffer);
     dev_depthbuffer = NULL;
+
+    cudaFree(dev_framebuffer);
+    dev_framebuffer = NULL;
+
     checkCUDAError("rasterizeFree");
 }
