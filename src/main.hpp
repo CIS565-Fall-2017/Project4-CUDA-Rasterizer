@@ -1,3 +1,11 @@
+/**
+ * @file      main.hpp
+ * @brief     Main file for CUDA rasterizer. Handles CUDA-GL interop for display.
+ * @authors   Skeleton code: Yining Karl Li, Kai Ninomiya
+ * @date      2012-2015
+ * @copyright University of Pennsylvania
+ */
+
 #pragma once
 
 #include <GL/glew.h>
