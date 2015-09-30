@@ -1,12 +1,4 @@
-/**
- * @file      main.cpp
- * @brief     Main file for CUDA rasterizer. Handles CUDA-GL interop for display.
- * @authors   Skeleton code: Yining Karl Li, Kai Ninomiya
- * @date      2012-2015
- * @copyright University of Pennsylvania
- */
-
-#include "main.hpp"
+#include "main.h"
 
 //-------------------------------
 //-------------MAIN--------------
@@ -126,7 +118,7 @@ bool init(obj *mesh) {
     };
     rasterizeSetBuffers(mesh->getBufIdxsize(), mesh->getBufIdx(),
             mesh->getBufPossize() / 3,
-            mesh->getBufPos(), mesh->getBufNor(), mesh->getBufCol());
+            mesh->getBufPos(), mesh->getBufNor(), mesh->getBufTex());
 
     GLuint passthroughProgram;
     passthroughProgram = initShader();
