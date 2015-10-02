@@ -185,7 +185,10 @@ Start out by testing a single triangle (`tri.obj`).
 * Fragments to depth buffer.
   * `FragmentOut[m] -> FragmentOut[width][height]`
   * Results in race conditions - don't bother to fix these until it works!
-  * Can really be done inside the fragment shader.
+  * Can really be done inside the fragment shader, if you call the fragment
+    shader from the rasterization kernel for every fragment (including those
+    which get occluded). **OR,** this can be done before fragment shading, which
+    may be faster but means the fragment shader cannot change the depth.
 * A depth buffer for storing and depth testing fragments.
   * `FragmentOut[width][height] depthbuffer`
   * An array of `fragment` objects.
@@ -200,7 +203,8 @@ Start out by testing a single triangle (`tri.obj`).
 * Clear the depth buffer with some default value.
 * Vertex shading: 
   * `VertexIn[n] vs_input -> VertexOut[n] vs_output`
-  * Apply some vertex transformation (e.g. model-view-projection matrix).
+  * Apply some vertex transformation (e.g. model-view-projection matrix using
+    `glm::lookAt ` and `glm::perspective `).
 * Primitive assembly.
   * `VertexOut[n] vs_output -> Triangle[n/3] primitives`
   * As above.
