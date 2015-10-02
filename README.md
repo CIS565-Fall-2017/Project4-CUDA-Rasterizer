@@ -221,9 +221,12 @@ Start out by testing a single triangle (`tri.obj`).
     by kernel parameters (like GLSL uniforms).
 * Fragments to depth buffer.
   * `FragmentOut[m] -> FragmentOut[width][height]`
-  * Can really be done inside the fragment shader.
-    * An optimization: this allows you to do depth tests before spending
-      execution time in complex fragment shader code!
+  * Can really be done inside the fragment shader, if you call the fragment
+    shader from the rasterization kernel for every fragment (including those
+    which get occluded). **OR,** this can be done before fragment shading, which
+    may be faster but means the fragment shader cannot change the depth.
+    * This result in an optimization: it allows you to do depth tests before
+     spending execution time in complex fragment shader code!
   * Handle race conditions! Since multiple primitives write fragments to the
     same fragment in the depth buffer, depth buffer locations must be locked
     while comparing the old and new fragment depths and (possibly) writing into
