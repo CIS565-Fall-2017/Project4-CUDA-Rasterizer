@@ -234,8 +234,8 @@ Start out by testing a single triangle (`tri.obj`).
       a thread is comparing old and new fragment depths (and possibly writing
       a new fragment). This should work in all cases, but be slower.
     * *Approach 2:* Convert your depth value to a fixed-point `int`, and use
-      `atomicMin` to store it into an `int`-typed depth buffer. After that,
-      the value which made it into that `int` depth buffer is that of the
+      `atomicMin` to store it into an `int`-typed depth buffer `intdepth`. After
+      that, the value which is stored at `intdepth[i]` is (usually) that of the
       fragment which should be stored into the `fragment` depth buffer.
       * This may result in some rare race conditions (across blocks).
     * The `flower.obj` test file is good for testing race conditions.
