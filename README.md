@@ -237,7 +237,7 @@ Start out by testing a single triangle (`tri.obj`).
       `atomicMin` to store it into an `int`-typed depth buffer `intdepth`. After
       that, the value which is stored at `intdepth[i]` is (usually) that of the
       fragment which should be stored into the `fragment` depth buffer.
-      * This may result in some rare race conditions (across blocks).
+      * This may result in some rare race conditions (e.g. across blocks).
     * The `flower.obj` test file is good for testing race conditions.
 * A depth buffer for storing and depth testing fragments.
   * `FragmentOut[width][height] depthbuffer`
