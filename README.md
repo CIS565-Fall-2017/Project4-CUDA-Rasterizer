@@ -228,9 +228,16 @@ Start out by testing a single triangle (`tri.obj`).
     * This result in an optimization: it allows you to do depth tests before
      spending execution time in complex fragment shader code!
   * Handle race conditions! Since multiple primitives write fragments to the
-    same fragment in the depth buffer, depth buffer locations must be locked
-    while comparing the old and new fragment depths and (possibly) writing into
-    it.
+    same fragment in the depth buffer, races must be avoided by using CUDA
+    atomics.
+    * *Approach 1:* Lock the location in the depth buffer during the time that
+      a thread is comparing old and new fragment depths (and possibly writing
+      a new fragment). This should work in all cases, but be slower.
+    * *Approach 2:* Convert your depth value to a fixed-point `int`, and use
+      `atomicMin` to store it into an `int`-typed depth buffer. After that,
+      the value which made it into that `int` depth buffer is that of the
+      fragment which should be stored into the `fragment` depth buffer.
+      * This may result in some rare race conditions (across blocks).
     * The `flower.obj` test file is good for testing race conditions.
 * A depth buffer for storing and depth testing fragments.
   * `FragmentOut[width][height] depthbuffer`
