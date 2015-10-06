@@ -124,6 +124,10 @@ void obj::buildBufPoss() {
         ibo[i] = BufIdxvec[i];
     }
     setColor(glm::vec3(1, 1, 1));
+
+    printf("Mesh built: buffers contain %d faces & %d vertices\n",
+            getBufIdxsize() / 3,
+            getBufPossize() / 3);
 }
 
 void obj::compareMaxMin(float x, float y, float z) {

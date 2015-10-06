@@ -42,13 +42,17 @@ bunch of them around so you can pick a few to document your progress.
 
 * `src/` C++/CUDA source files.
 * `util/` C++ utility files.
-* `objs/` Example OBJ test files:
-  * `tri.obj` (3 verts, 1 tri): The simplest possible geometric object.
-  * `cube.obj` (8 verts, 12 tris): A small model with low depth-complexity.
-  * `suzanne.obj` (507 verts, 968 tris): A medium model with low depth-complexity.
-  * `cow.obj` (4583 verts, 5804 tris): A large model with low depth-complexity.
-  * `flower.obj` (640 verts, 640 tris): A medium model with very high depth-complexity.
-  * `sponza.obj` (153,635 verts, 279,163 tris): A huge model with very high depth-complexity.
+* `objs/` Example OBJ test files (# verts, # tris in buffers after loading)
+  * `tri.obj` (3v, 1t): The simplest possible geometric object.
+  * `cube.obj` (36v, 12t): A small model with low depth-complexity.
+  * `suzanne.obj` (2904 verts, 968 tris): A medium model with low depth-complexity.
+  * `suzanne_smooth.obj` (2904 verts, 968 tris): A medium model with low depth-complexity.
+    This model has normals which must be interpolated.
+  * `cow.obj` (17412 verts, 5804 tris): A large model with low depth-complexity.
+  * `cow_smooth.obj` (17412 verts, 5804 tris): A large model with low depth-complexity.
+    This model has normals which must be interpolated.
+  * `flower.obj` (1920 verts, 640 tris): A medium model with very high depth-complexity.
+  * `sponza.obj` (837,489 verts, 279,163 tris): A huge model with very high depth-complexity.
 * `renders/` Debug render of an example OBJ.
 * `external/` Includes and static libraries for 3rd party libraries.
 

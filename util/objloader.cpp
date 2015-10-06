@@ -116,7 +116,11 @@ objLoader::objLoader(string filename, obj *newMesh) {
                 }
             }
         }
-        cout << "Loaded " << geomesh->getFaces()->size() << " faces, " << geomesh->getPoints()->size() << " vertices from " << filename << endl;
+
+        printf("Loaded %d faces & %d vertices from %s\n",
+                geomesh->getFaces()->size(),
+                geomesh->getPoints()->size(),
+                fname);
     } else {
         cout << "ERROR: " << filename << " could not be found" << endl;
         exit(EXIT_FAILURE);
