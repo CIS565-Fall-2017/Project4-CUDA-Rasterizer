@@ -48,7 +48,7 @@ void obj::buildBufPoss() {
     vector<int> BufIdxvec;
     int index = 0;
     bool genNormals = false;
-    if (faces.size() != (int) facenormals.size()) {
+    if (faces.size() != facenormals.size() || facenormals[0].size() == 0) {
         genNormals = true;
     }
     for (int k = 0; k < (int) faces.size(); k++) {
