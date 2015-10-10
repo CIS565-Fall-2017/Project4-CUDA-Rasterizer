@@ -95,8 +95,8 @@ You will need to implement the following features/pipeline stages:
 
 See below for more guidance.
 
-You are also required to implement at least "3.0" points in extra features.
-(the parenthesized numbers must add to 3.0 or more):
+You are also required to implement at least 3.0 "points" worth in extra features.
+(point values are given in parentheses):
 
 * (1.0) Tile-based pipeline.
 * Additional pipeline stages.
