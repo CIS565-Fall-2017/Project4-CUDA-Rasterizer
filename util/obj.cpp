@@ -10,26 +10,18 @@
 #include <limits>
 #include "obj.hpp"
 
-#define EPSILON std::numeric_limits<double>::epsilon()
+#define EPSILON 0.000001
 
 using namespace std;
 
-obj::obj() {
-    vbosize = 0;
-    nbosize = 0;
-    cbosize = 0;
-    ibosize = 0;
-    top = 0;
-    defaultColor = glm::vec3(0, 0, 0);
-    boundingbox = new float[32];
-    maxminSet = false;
-    xmax = 0;
-    xmin = 0;
-    ymax = 0;
-    ymin = 0;
-    zmax = 0;
-    zmin = 0;
-
+obj::obj() :
+    vbosize(0), nbosize(0), cbosize(0), ibosize(0),
+    vbo(NULL), nbo(NULL), cbo(NULL), ibo(NULL),
+    boundingbox(new float[32]),
+    top(0),
+    defaultColor(glm::vec3(0, 0, 0)),
+    xmax(0), xmin(0), ymax(0), ymin(0), zmax(0), zmin(0),
+    maxminSet(false) {
 }
 
 obj::~obj() {
@@ -37,8 +29,10 @@ obj::~obj() {
     for (int i = 0; i < (int) faceboxes.size(); i++) {
         delete faceboxes[i];
     }
-
-
+    if (vbo) { delete vbo; }
+    if (nbo) { delete nbo; }
+    if (cbo) { delete cbo; }
+    if (ibo) { delete ibo; }
 }
 
 void obj::buildBufPoss() {
@@ -412,6 +406,7 @@ void obj::recenter() {
 }
 
 void obj::setColor(glm::vec3 newColor) {
+    if (cbo) { delete cbo; }
     cbosize = ibosize * 3;
     cbo = new float[cbosize];
     for (int i = 0; i < (cbosize / 3); i++) {
