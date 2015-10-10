@@ -237,6 +237,7 @@ Start out by testing a single triangle (`tri.obj`).
     * *Approach 1:* Lock the location in the depth buffer during the time that
       a thread is comparing old and new fragment depths (and possibly writing
       a new fragment). This should work in all cases, but be slower.
+      See the section below on implementing this.
     * *Approach 2:* Convert your depth value to a fixed-point `int`, and use
       `atomicMin` to store it into an `int`-typed depth buffer `intdepth`. After
       that, the value which is stored at `intdepth[i]` is (usually) that of the
@@ -263,9 +264,39 @@ you choose and why.
 
 ## Resources
 
-The following resources may be useful for this project:
+### CUDA Mutexes
 
-* High-Performance Software Rasterization on GPUs:
+Adapted from
+[this StackOverflow question](http://stackoverflow.com/questions/21341495/cuda-mutex-and-atomiccas).
+
+```
+__global__ void kernelFunction(...) {
+    // Get a pointer to the mutex, which should be 0 right now.
+    unsigned int *mutex = ...;
+
+    // Loop-wait until this thread is able to execute its critical section.
+    bool isSet;
+    do {
+        isSet = (atomicCAS(mutex, 0, 1) == 0);
+        if (isSet) {
+            // Critical section goes here.
+            // The critical section MUST be inside the wait loop;
+            // if it is afterward, a deadlock will occur.
+        }
+        if (isSet) {
+            mutex = 0;
+        }
+    } while (!isSet);
+}
+```
+
+### Links
+
+The following resources may be useful for this project.
+
+* Line Rasterization slides, MIT EECS 6.837, Teller and Durand
+  * [Slides](http://groups.csail.mit.edu/graphics/classes/6.837/F02/lectures/6.837-7_Line.pdf)
+* High-Performance Software Rasterization on GPUs
   * [Paper (HPG 2011)](http://www.tml.tkk.fi/~samuli/publications/laine2011hpg_paper.pdf)
   * [Code](http://code.google.com/p/cudaraster/)
   * Note that looking over this code for reference with regard to the paper is
@@ -273,16 +304,16 @@ The following resources may be useful for this project:
     incorporate any of this code into your project.
   * [Slides](http://bps11.idav.ucdavis.edu/talks/08-gpuSoftwareRasterLaineAndPantaleoni-BPS2011.pdf)
 * The Direct3D 10 System (SIGGRAPH 2006) - for those interested in doing
-  geometry shaders and transform feedback:
+  geometry shaders and transform feedback
   * [Paper](http://dl.acm.org/citation.cfm?id=1141947)
   * [Paper, through Penn Libraries proxy](http://proxy.library.upenn.edu:2247/citation.cfm?id=1141947)
 * Multi-Fragment Eﬀects on the GPU using the k-Buﬀer - for those who want to do
-  order-independent transparency using a k-buffer:
+  order-independent transparency using a k-buffer
   * [Paper](http://www.inf.ufrgs.br/~comba/papers/2007/kbuffer_preprint.pdf)
 * FreePipe: A Programmable, Parallel Rendering Architecture for Efficient
-  Multi-Fragment Effects (I3D 2010):
+  Multi-Fragment Effects (I3D 2010)
   * [Paper](https://sites.google.com/site/hmcen0921/cudarasterizer)
-* Writing A Software Rasterizer In Javascript:
+* Writing A Software Rasterizer In Javascript
   * [Part 1](http://simonstechblog.blogspot.com/2012/04/software-rasterizer-part-1.html)
   * [Part 2](http://simonstechblog.blogspot.com/2012/04/software-rasterizer-part-2.html)
 
