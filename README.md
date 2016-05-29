@@ -14,4 +14,6 @@ CUDA Rasterizer
 project, and we will not be able to grade you without a good README.
 
 
+### Credits
 
+* [tinygltfloader](https://github.com/syoyo/tinygltfloader) by @soyoyo
