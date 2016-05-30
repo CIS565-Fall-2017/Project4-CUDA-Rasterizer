@@ -161,7 +161,7 @@ Start out by testing a single triangle (`tri.obj`).
   * A minimal vertex shader will apply no transformations at all - it draws
     directly in normalized device coordinates (-1 to 1 in each dimension).
 * Primitive assembly.
-  * `VertexOut[n] vs_output -> Triangle[n/3] primitives`
+  * `VertexOut[n] vs_output -> Triangle[n/3] primitives` **ATTENTION**: use indices for assembly, not divide the id by 3! 
   * Start by supporting ONLY triangles. For a triangle defined by indices
     `(a, b, c)` into `VertexOut` array `vo`, simply copy the appropriate values
     into a `Triangle` object `(vo[a], vo[b], vo[c])`.
