@@ -1,10 +1,12 @@
 /**
  * @file      main.cpp
  * @brief     Main file for CUDA rasterizer. Handles CUDA-GL interop for display.
- * @authors   Skeleton code: Yining Karl Li, Kai Ninomiya
- * @date      2012-2015
+ * @authors   Skeleton code: Yining Karl Li, Kai Ninomiya, Shuai Shao (Shrek)
+ * @date      2012-2016
  * @copyright University of Pennsylvania
  */
+
+
 
 #include "main.hpp"
 
@@ -18,19 +20,44 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    obj *mesh = new obj();
+    //obj *mesh = new obj();
 
-    {
-        objLoader loader(argv[1], mesh);
-        mesh->buildBufPoss();
-    }
+    //{
+    //    objLoader loader(argv[1], mesh);
+    //    mesh->buildBufPoss();
+    //}
+
+	tinygltf::Scene scene;
+	tinygltf::TinyGLTFLoader loader;
+	std::string err;
+	std::string input_filename(argv[1]);
+	std::string ext = getFilePathExtension(input_filename);
+
+	bool ret = false;
+	if (ext.compare("glb") == 0) {
+		// assume binary glTF.
+		ret = loader.LoadBinaryFromFile(&scene, &err, input_filename.c_str());
+	} else {
+		// assume ascii glTF.
+		ret = loader.LoadASCIIFromFile(&scene, &err, input_filename.c_str());
+	}
+
+	if (!err.empty()) {
+		printf("Err: %s\n", err.c_str());
+	}
+
+	if (!ret) {
+		printf("Failed to parse glTF\n");
+		return -1;
+	}
+
 
     frame = 0;
     seconds = time(NULL);
     fpstracker = 0;
 
     // Launch CUDA/GL
-    if (init(mesh)) {
+    if (init(scene)) {
         // GLFW main loop
         mainLoop();
     }
@@ -90,7 +117,7 @@ void runCuda() {
 //----------SETUP STUFF----------
 //-------------------------------
 
-bool init(obj *mesh) {
+bool init(const tinygltf::Scene & scene) {
     glfwSetErrorCallback(errorCallback);
 
     if (!glfwInit()) {
@@ -117,16 +144,40 @@ bool init(obj *mesh) {
     initVAO();
     initTextures();
     initCuda();
-    initPBO();
+	initPBO();
 
-    float cbo[] = {
-        0.0, 1.0, 0.0,
-        0.0, 0.0, 1.0,
-        1.0, 0.0, 0.0
-    };
-    rasterizeSetBuffers(mesh->getBufIdxsize(), mesh->getBufIdx(),
-            mesh->getBufPossize() / 3,
-            mesh->getBufPos(), mesh->getBufNor(), mesh->getBufCol());
+	//float cbo[] = {
+	//    0.0, 1.0, 0.0,
+	//    0.0, 0.0, 1.0,
+	//    1.0, 0.0, 0.0
+	//};
+
+	{
+		std::map<std::string, std::vector<std::string> >::const_iterator it(
+			scene.scenes.begin());
+		std::map<std::string, std::vector<std::string> >::const_iterator itEnd(
+			scene.scenes.end());
+		//std::cout << "scenes(items=" << scene.scenes.size() << ")" << std::endl;
+		for (; it != itEnd; it++) {
+			//std::cout << Indent(1) << "name  : " << it->first << std::endl;
+			//std::cout << Indent(2) << "nodes : [ ";
+			for (size_t i = 0; i < it->second.size(); i++) {
+				std::cout << it->second[i]
+					<< ((i != (it->second.size() - 1)) ? ", " : "");
+			}
+			std::cout << " ] " << std::endl;
+		}
+	}
+
+	
+
+
+
+
+
+	rasterizeSetBuffers(mesh->getBufIdxsize(), mesh->getBufIdx(),
+		mesh->getBufPossize() / 3,
+		mesh->getBufPos(), mesh->getBufNor(), mesh->getBufCol());
 
     GLuint passthroughProgram;
     passthroughProgram = initShader();
@@ -273,4 +324,13 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
+}
+
+//----------------------------
+//----- util -----------------
+//----------------------------
+static std::string getFilePathExtension(const std::string &FileName) {
+	if (FileName.find_last_of(".") != std::string::npos)
+		return FileName.substr(FileName.find_last_of(".") + 1);
+	return "";
 }

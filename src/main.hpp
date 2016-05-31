@@ -23,6 +23,10 @@
 #include <util/glslUtility.hpp>
 #include <util/utilityCore.hpp>
 #include <util/objloader.hpp>
+
+// tiny gltf loader
+
+
 #include "rasterize.h"
 
 using namespace std;
@@ -72,7 +76,7 @@ void keyboard(unsigned char key, int x, int y);
 //-------------------------------
 //----------SETUP STUFF----------
 //-------------------------------
-bool init(obj *mesh);
+bool init(const tinygltf::Scene & scene);
 void initPBO();
 void initCuda();
 void initTextures();
@@ -93,3 +97,8 @@ void deleteTexture(GLuint *tex);
 void mainLoop();
 void errorCallback(int error, const char *description);
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
+
+//----------------------------
+//----- util -----------------
+//----------------------------
+std::string getFilePathExtension(const std::string &FileName);
