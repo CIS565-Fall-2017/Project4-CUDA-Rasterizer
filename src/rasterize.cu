@@ -25,17 +25,17 @@ struct VertexOut {
     // TODO
 };
 
-
+typedef unsigned short VertexIndex;
 typedef glm::vec3 VertexAttributePosition;
 typedef glm::vec3 VertexAttributeNormal;
 typedef glm::vec2 VertexAttributeTexcoord;
 
-// VertexIn
-static int* dev_indices;
-
-static VertexAttributePosition* dev_vertexAttributePosition = NULL;
-static VertexAttributeNormal* dev_vertexAttributeNormal = NULL;
-static VertexAttributeTexcoord* dev_vertexAttributeTexcoord0 = NULL;
+//// VertexIn
+//static int* dev_indices;
+//
+//static VertexAttributePosition* dev_vertexAttributePosition = NULL;
+//static VertexAttributeNormal* dev_vertexAttributeNormal = NULL;
+//static VertexAttributeTexcoord* dev_vertexAttributeTexcoord0 = NULL;
 
 
 
@@ -146,16 +146,49 @@ void rasterizeInit(int w, int h) {
 //}
 
 
-static std::map<std::string, char*> bufferViewDevPointers;
 
-static std::map<std::string, VertexAttributePosition*> mapBufferView2VertexAttributePosition;
 
-static std::map<std::string, Primitive*> primitiveDevPointers;
+
+
+
 
 
 // Buffer State
 
 // Attribute State (bufferview pointer, byte offset, byte stride, count(vec2/vec3), primitive type)
+
+// 1. for mesh, for each primitive, create device buffer for indices and attributes (accessor), and bind all attribute(acessor) state
+// 2. (kern) vertex shader (transform position)
+// 3. for each primitive, do primitive assembly ( each attribute buffer => Primitive * dev_primitives)
+
+
+
+
+
+struct PrimitiveDevBufPointers {
+	VertexIndex* dev_indices;
+	//VertexIn* dev_vertices;
+	VertexAttributePosition* dev_position;
+	VertexAttributeNormal* dev_normal;
+	VertexAttributeTexcoord* dev_texcoord0;
+
+	//TODO: add more attributes when necessary
+};
+
+//static std::map<std::string, > primitiveBufState;
+//
+static std::map<std::string, char*> bufferViewDevPointers;
+//
+//static std::map<std::string, VertexAttributePosition*> mapBufferView2VertexAttributePosition;
+//
+
+// <mesh_name, vector<Primitives> >
+static std::map<std::string, std::vector<PrimitiveDevBufPointers>> mesh2PrimitiveVector;
+
+static std::map<std::string, PrimitiveDevBufPointers> primitiveDevPointers;
+
+
+
 
 void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
@@ -176,7 +209,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 			const tinygltf::Buffer &buffer = scene.buffers[bufferView.buffer];
 
-			
+			// ? __constant__
 			char* dev_bufferView;
 			cudaMalloc(&dev_bufferView, bufferView.byteLength);
 			cudaMemcpy(dev_bufferView, &buffer.data.front() + bufferView.byteOffset, bufferView.byteLength, cudaMemcpyHostToDevice);
@@ -197,19 +230,35 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 
 
-	// 2. meshes: indices, attributes
+	// 2. for each meshes: for each primitive: build VertexIn with indices, attributes
 	{
 		std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
 		std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
 
+		// for each mesh
 		for (; it != itEnd; it++) {
 			const tinygltf::Mesh & mesh = it->second;
 
+			auto res = mesh2PrimitiveVector.insert(std::pair<std::string, std::vector<PrimitiveDevBufPointers>>(mesh.name, std::vector<PrimitiveDevBufPointers>()));
+			std::vector<PrimitiveDevBufPointers> & primitiveVector = res.first;
+
+			// for each primitive
 			for (size_t i = 0; i < mesh.primitives.size(); i++) {
 				const tinygltf::Primitive &primitive = mesh.primitives[i];
 
 				if (primitive.indices.empty())
 					return;
+
+
+				// TODO: ? now position, normal, etc data type is predefined
+				VertexIndex* dev_indices;
+				VertexAttributePosition* dev_position;
+				VertexAttributeNormal* dev_normal;
+				VertexAttributeTexcoord* dev_texcoord0;
+
+
+
+				// ----------Attributes-------------
 
 				std::map<std::string, std::string>::const_iterator it(
 					primitive.attributes.begin());
@@ -219,85 +268,121 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 				// Assume TEXTURE_2D target for the texture object.
 				//glBindTexture(GL_TEXTURE_2D, gMeshState[mesh.name].diffuseTex[i]);
 
+				// for each attribute
 				for (; it != itEnd; it++) {
 					const tinygltf::Accessor &accessor = scene.accessors[it->second];
+					const tinygltf::BufferView &bufferView = scene.bufferViews[accessor.bufferView];
+
 					//glBindBuffer(GL_ARRAY_BUFFER, gBufferState[accessor.bufferView].vb);
 					//CheckErrors("bind buffer");
-					int count = 1;
+					int n = 1;
 					if (accessor.type == TINYGLTF_TYPE_SCALAR) {
-						count = 1;
+						n = 1;
 					}
 					else if (accessor.type == TINYGLTF_TYPE_VEC2) {
-						count = 2;
+						n = 2;
 					}
 					else if (accessor.type == TINYGLTF_TYPE_VEC3) {
-						count = 3;
+						n = 3;
 					}
 					else if (accessor.type == TINYGLTF_TYPE_VEC4) {
-						count = 4;
+						n = 4;
 					}
-					// it->first would be "POSITION", "NORMAL", "TEXCOORD_0", ...
-					if ((it->first.compare("POSITION") == 0) ||
-						(it->first.compare("NORMAL") == 0) ||
-						(it->first.compare("TEXCOORD_0") == 0)) {
+
+					//// it->first would be "POSITION", "NORMAL", "TEXCOORD_0", ...
+					//if ((it->first.compare("POSITION") == 0) ||
+					//	(it->first.compare("NORMAL") == 0) ||
+					//	(it->first.compare("TEXCOORD_0") == 0)) {
 
 
-						glVertexAttribPointer(
-							gGLProgramState.attribs[it->first], count, accessor.componentType,
-							GL_FALSE, accessor.byteStride, BUFFER_OFFSET(accessor.byteOffset));
-						CheckErrors("vertex attrib pointer");
-						glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
-						CheckErrors("enable vertex attrib array");
+					//	glVertexAttribPointer(
+					//		gGLProgramState.attribs[it->first], count, accessor.componentType,
+					//		GL_FALSE, accessor.byteStride, BUFFER_OFFSET(accessor.byteOffset));
+					//	CheckErrors("vertex attrib pointer");
+					//	glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
+					//	CheckErrors("enable vertex attrib array");
+					//}
+					char * dev_bufferView = bufferViewDevPointers.at(accessor.bufferView);
+
+
+
+					if (it->first.compare("POSITION") == 0) {
+						int byteLength = numVertices * n * sizeof(VertexAttributePosition);
+
+						// ???????? TODO: byteStride ????????????????
+						// TODO: use a kernel with stride to copy data
+						cudaMalloc(&dev_position, byteLength);
+						cudaMemcpy(
+							dev_position,
+							dev_bufferView + bufferView.byteOffset + accessor.byteOffset,
+							byteLength,
+							cudaMemcpyDeviceToDevice);
+					} 
+					else if (it->first.compare("NORMAL") == 0) {
+						int byteLength = numVertices * n * sizeof(VertexAttributeNormal);
+						cudaMalloc(&dev_normal, byteLength);
+						cudaMemcpy(
+							dev_normal,
+							dev_bufferView + bufferView.byteOffset + accessor.byteOffset,
+							byteLength,
+							cudaMemcpyDeviceToDevice);
+					}
+					else if (it->first.compare("TEXCOORD_0") == 0) {
+						int byteLength = numVertices * n * sizeof(VertexAttributeTexcoord);
+						cudaMalloc(&dev_texcoord0, byteLength);
+						cudaMemcpy(
+							dev_texcoord0,
+							dev_bufferView + bufferView.byteOffset + accessor.byteOffset,
+							byteLength,
+							cudaMemcpyDeviceToDevice);
 					}
 				}
+
+
+
+
+
+				// ----------Indices-------------
 
 				const tinygltf::Accessor &indexAccessor = scene.accessors[primitive.indices];
-				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
-					gBufferState[indexAccessor.bufferView].vb);
-				CheckErrors("bind buffer");
-				int mode = -1;
-				if (primitive.mode == TINYGLTF_MODE_TRIANGLES) {
-					mode = GL_TRIANGLES;
-				}
-				else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_STRIP) {
-					mode = GL_TRIANGLE_STRIP;
-				}
-				else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_FAN) {
-					mode = GL_TRIANGLE_FAN;
-				}
-				else if (primitive.mode == TINYGLTF_MODE_POINTS) {
-					mode = GL_POINTS;
-				}
-				else if (primitive.mode == TINYGLTF_MODE_LINE) {
-					mode = GL_LINES;
-				}
-				else if (primitive.mode == TINYGLTF_MODE_LINE_LOOP) {
-					mode = GL_LINE_LOOP;
-				};
-				glDrawElements(mode, indexAccessor.count, indexAccessor.componentType,
-					BUFFER_OFFSET(indexAccessor.byteOffset));
-				CheckErrors("draw elements");
+				const tinygltf::BufferView &bufferView = scene.bufferViews[indexAccessor.bufferView];
+				char * dev_bufferView = bufferViewDevPointers.at(indexAccessor.bufferView);
+				
+				// !! assume type is SCALAR
+				int byteLength = indexAccessor.count * sizeof(VertexIndex);
 
-				{
-					std::map<std::string, std::string>::const_iterator it(
-						primitive.attributes.begin());
-					std::map<std::string, std::string>::const_iterator itEnd(
-						primitive.attributes.end());
+				cudaMalloc(&dev_indices, byteLength);
+				cudaMemcpy(
+					dev_indices,
+					dev_bufferView + bufferView.byteOffset + indexAccessor.byteOffset,
+					byteLength,
+					cudaMemcpyDeviceToDevice);
 
-					for (; it != itEnd; it++) {
-						if ((it->first.compare("POSITION") == 0) ||
-							(it->first.compare("NORMAL") == 0) ||
-							(it->first.compare("TEXCOORD_0") == 0)) {
-							glDisableVertexAttribArray(gGLProgramState.attribs[it->first]);
-						}
-					}
-				}
+
+				// ----------Materials-------------
+				// TODO
+
+
+				// at the end of the for loop of primitive
+				// push dev pointers to map
+				primitiveVector.push_back(PrimitiveDevBufPointers{
+					dev_indices,
+					dev_position,
+					dev_normal,
+					dev_texcoord0
+				});
 			}
 
 		}
 
 	}
 	
+
+
+	// Finally, cudaFree raw dev_bufferViews
+
+
+
 
 	// attributes (of vertices)
 
