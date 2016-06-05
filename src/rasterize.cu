@@ -10,7 +10,7 @@
 
 #include <cmath>
 #include <cstdio>
-#include <cuda.h>
+
 #include <thrust/random.h>
 #include <util/checkCUDAError.h>
 #include "rasterizeTools.h"
@@ -67,7 +67,7 @@ static int vertCount = 0;
 /**
  * Kernel that writes the image to the OpenGL PBO directly.
  */
-__global__
+__global__ 
 void sendImageToPBO(uchar4 *pbo, int w, int h, glm::vec3 *image) {
     int x = (blockIdx.x * blockDim.x) + threadIdx.x;
     int y = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -175,9 +175,8 @@ struct PrimitiveDevBufPointers {
 	//TODO: add more attributes when necessary
 };
 
-//static std::map<std::string, > primitiveBufState;
-//
-static std::map<std::string, char*> bufferViewDevPointers;
+
+
 //
 //static std::map<std::string, VertexAttributePosition*> mapBufferView2VertexAttributePosition;
 //
@@ -188,9 +187,22 @@ static std::map<std::string, std::vector<PrimitiveDevBufPointers>> mesh2Primitiv
 static std::map<std::string, PrimitiveDevBufPointers> primitiveDevPointers;
 
 
+__global__ 
+void _deviceBufferCopy(char* dev_dst, const char* dev_src, int byteStride, int byteOffset, int componentTypeByteSize) {
+	
+	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+
+	for (int j = 0; j < componentTypeByteSize; j++) {
+		dev_dst[i + j] = dev_src[byteOffset + i * byteStride + j];
+	}
+
+}
 
 
 void rasterizeSetBuffers(const tinygltf::Scene & scene) {
+
+	std::map<std::string, char*> bufferViewDevPointers;
 
 	// 1. copy all `bufferViews` to device memory
 	{
@@ -199,15 +211,14 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 		std::map<std::string, tinygltf::BufferView>::const_iterator itEnd(
 			scene.bufferViews.end());
 
-		
-
 		for (; it != itEnd; it++) {
 			const tinygltf::BufferView &bufferView = it->second;
 			if (bufferView.target == 0) {
 				continue; // Unsupported bufferView.
 			}
 
-			const tinygltf::Buffer &buffer = scene.buffers[bufferView.buffer];
+			//const tinygltf::Buffer &buffer = scene.buffers[bufferView.buffer];
+			const tinygltf::Buffer &buffer = scene.buffers.at(bufferView.buffer);
 
 			// ? __constant__
 			char* dev_bufferView;
@@ -215,22 +226,12 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 			cudaMemcpy(dev_bufferView, &buffer.data.front() + bufferView.byteOffset, bufferView.byteLength, cudaMemcpyHostToDevice);
 
 			bufferViewDevPointers.insert(std::pair<std::string, char*>(bufferView.name, dev_bufferView));
-
-			
-			//GLBufferState state;
-			//glGenBuffers(1, &state.vb);
-			//glBindBuffer(bufferView.target, state.vb);
-			//glBufferData(bufferView.target, bufferView.byteLength,
-			//	&buffer.data.at(0) + bufferView.byteOffset, GL_STATIC_DRAW);
-			//glBindBuffer(bufferView.target, 0);
-
-			//gBufferState[it->first] = state;
 		}
 	}
 
 
 
-	// 2. for each meshes: for each primitive: build VertexIn with indices, attributes
+	// 2. for each meshes: for each primitive: build device buffer of indices, materail, and each attributes
 	{
 		std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
 		std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
@@ -239,8 +240,8 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 		for (; it != itEnd; it++) {
 			const tinygltf::Mesh & mesh = it->second;
 
-			auto res = mesh2PrimitiveVector.insert(std::pair<std::string, std::vector<PrimitiveDevBufPointers>>(mesh.name, std::vector<PrimitiveDevBufPointers>()));
-			std::vector<PrimitiveDevBufPointers> & primitiveVector = res.first;
+			std::pair<std::map<std::string, std::vector<PrimitiveDevBufPointers>>::iterator, bool> res = mesh2PrimitiveVector.insert(std::pair<std::string, std::vector<PrimitiveDevBufPointers>>(mesh.name, std::vector<PrimitiveDevBufPointers>()));
+			std::vector<PrimitiveDevBufPointers> & primitiveVector = (res.first)->second;
 
 			// for each primitive
 			for (size_t i = 0; i < mesh.primitives.size(); i++) {
@@ -257,24 +258,18 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 				VertexAttributeTexcoord* dev_texcoord0;
 
 
-
 				// ----------Attributes-------------
 
-				std::map<std::string, std::string>::const_iterator it(
-					primitive.attributes.begin());
-				std::map<std::string, std::string>::const_iterator itEnd(
-					primitive.attributes.end());
-
-				// Assume TEXTURE_2D target for the texture object.
-				//glBindTexture(GL_TEXTURE_2D, gMeshState[mesh.name].diffuseTex[i]);
+				//std::map<std::string, std::string>::const_iterator it(primitive.attributes.begin());
+				auto it(primitive.attributes.begin());
+				//std::map<std::string, std::string>::const_iterator itEnd(primitive.attributes.end());
+				auto itEnd(primitive.attributes.end());
 
 				// for each attribute
 				for (; it != itEnd; it++) {
-					const tinygltf::Accessor &accessor = scene.accessors[it->second];
-					const tinygltf::BufferView &bufferView = scene.bufferViews[accessor.bufferView];
+					const tinygltf::Accessor &accessor = scene.accessors.at(it->second);
+					const tinygltf::BufferView &bufferView = scene.bufferViews.at(accessor.bufferView);
 
-					//glBindBuffer(GL_ARRAY_BUFFER, gBufferState[accessor.bufferView].vb);
-					//CheckErrors("bind buffer");
 					int n = 1;
 					if (accessor.type == TINYGLTF_TYPE_SCALAR) {
 						n = 1;
@@ -289,53 +284,39 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 						n = 4;
 					}
 
-					//// it->first would be "POSITION", "NORMAL", "TEXCOORD_0", ...
-					//if ((it->first.compare("POSITION") == 0) ||
-					//	(it->first.compare("NORMAL") == 0) ||
-					//	(it->first.compare("TEXCOORD_0") == 0)) {
-
-
-					//	glVertexAttribPointer(
-					//		gGLProgramState.attribs[it->first], count, accessor.componentType,
-					//		GL_FALSE, accessor.byteStride, BUFFER_OFFSET(accessor.byteOffset));
-					//	CheckErrors("vertex attrib pointer");
-					//	glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
-					//	CheckErrors("enable vertex attrib array");
-					//}
 					char * dev_bufferView = bufferViewDevPointers.at(accessor.bufferView);
-
-
+					char * dev_attribute;
+					
+					int numVertices = accessor.count;
+					int componentTypeByteSize;
 
 					if (it->first.compare("POSITION") == 0) {
-						int byteLength = numVertices * n * sizeof(VertexAttributePosition);
-
-						// ???????? TODO: byteStride ????????????????
-						// TODO: use a kernel with stride to copy data
-						cudaMalloc(&dev_position, byteLength);
-						cudaMemcpy(
-							dev_position,
-							dev_bufferView + bufferView.byteOffset + accessor.byteOffset,
-							byteLength,
-							cudaMemcpyDeviceToDevice);
+						componentTypeByteSize = sizeof(VertexAttributePosition);
+						dev_attribute = (char*)dev_position;
 					} 
 					else if (it->first.compare("NORMAL") == 0) {
-						int byteLength = numVertices * n * sizeof(VertexAttributeNormal);
-						cudaMalloc(&dev_normal, byteLength);
-						cudaMemcpy(
-							dev_normal,
-							dev_bufferView + bufferView.byteOffset + accessor.byteOffset,
-							byteLength,
-							cudaMemcpyDeviceToDevice);
+						componentTypeByteSize = sizeof(VertexAttributeNormal);
+						dev_attribute = (char*)dev_normal;
 					}
 					else if (it->first.compare("TEXCOORD_0") == 0) {
-						int byteLength = numVertices * n * sizeof(VertexAttributeTexcoord);
-						cudaMalloc(&dev_texcoord0, byteLength);
-						cudaMemcpy(
-							dev_texcoord0,
-							dev_bufferView + bufferView.byteOffset + accessor.byteOffset,
-							byteLength,
-							cudaMemcpyDeviceToDevice);
+						componentTypeByteSize = sizeof(VertexAttributeTexcoord);
+						dev_attribute = (char*)dev_texcoord0;
 					}
+
+
+					dim3 numBlocks(128);
+					dim3 numThreadsPerBlock((numVertices + numBlocks.x - 1) / numBlocks.x);
+					int byteLength = numVertices * n * componentTypeByteSize;
+					cudaMalloc(&dev_position, byteLength);
+					_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
+						dev_attribute,
+						dev_bufferView,
+						accessor.byteStride,
+						bufferView.byteOffset + accessor.byteOffset,
+						componentTypeByteSize);
+
+					std::string msg = "Set Attribute Buffer: " + it->first;
+					checkCUDAError(msg.c_str());
 				}
 
 
@@ -344,19 +325,33 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 				// ----------Indices-------------
 
-				const tinygltf::Accessor &indexAccessor = scene.accessors[primitive.indices];
-				const tinygltf::BufferView &bufferView = scene.bufferViews[indexAccessor.bufferView];
+				const tinygltf::Accessor &indexAccessor = scene.accessors.at(primitive.indices);
+				const tinygltf::BufferView &bufferView = scene.bufferViews.at(indexAccessor.bufferView);
 				char * dev_bufferView = bufferViewDevPointers.at(indexAccessor.bufferView);
 				
 				// !! assume type is SCALAR
-				int byteLength = indexAccessor.count * sizeof(VertexIndex);
+				int n = 1;
+				int numVertices = indexAccessor.count;
+				int componentTypeByteSize = sizeof(VertexIndex);
+				int byteLength = numVertices * n * componentTypeByteSize;
 
-				cudaMalloc(&dev_indices, byteLength);
-				cudaMemcpy(
-					dev_indices,
-					dev_bufferView + bufferView.byteOffset + indexAccessor.byteOffset,
-					byteLength,
-					cudaMemcpyDeviceToDevice);
+				cudaMalloc(&dev_indices, byteLength);		
+
+				dim3 numBlocks(128);
+				dim3 numThreadsPerBlock((numVertices + numBlocks.x - 1) / numBlocks.x);
+				cudaMalloc(&dev_position, byteLength);
+				_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
+					(char*)dev_indices,
+					dev_bufferView,
+					indexAccessor.byteStride,
+					bufferView.byteOffset + indexAccessor.byteOffset,
+					componentTypeByteSize);
+
+				
+				checkCUDAError("Set Index Buffer");
+
+
+
 
 
 				// ----------Materials-------------
@@ -371,22 +366,27 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 					dev_normal,
 					dev_texcoord0
 				});
-			}
+			} // for each primitive
 
-		}
+		} // for each mesh
 
 	}
 	
 
 
 	// Finally, cudaFree raw dev_bufferViews
+	{
 
+		std::map<std::string, char*>::const_iterator it(bufferViewDevPointers.begin());
+		std::map<std::string, char*>::const_iterator itEnd(bufferViewDevPointers.end());
+			
+			//bufferViewDevPointers
 
+		for (; it != itEnd; it++) {
+			cudaFree(it->second);
+		}
+	}
 
-
-	// attributes (of vertices)
-
-	// TODO: textures
 
 }
 
