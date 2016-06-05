@@ -18,9 +18,6 @@
 #include <cuda_runtime.h>
 
 void rasterizeInit(int width, int height);
-//void rasterizeSetBuffers(
-//        int bufIdxSize, int *bufIdx,
-//        int vertCount, float *bufPos, float *bufNor, float *bufCol);
 void rasterizeSetBuffers(const tinygltf::Scene & scene);
 
 void rasterize(uchar4 *pbo);

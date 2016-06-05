@@ -30,15 +30,6 @@ typedef glm::vec3 VertexAttributePosition;
 typedef glm::vec3 VertexAttributeNormal;
 typedef glm::vec2 VertexAttributeTexcoord;
 
-//// VertexIn
-//static int* dev_indices;
-//
-//static VertexAttributePosition* dev_vertexAttributePosition = NULL;
-//static VertexAttributeNormal* dev_vertexAttributeNormal = NULL;
-//static VertexAttributeTexcoord* dev_vertexAttributeTexcoord0 = NULL;
-
-
-
 
 enum PrimitiveType{
 	Triangle,
@@ -53,6 +44,19 @@ struct Primitive {
 struct Fragment {
     glm::vec3 color;
 };
+
+
+struct PrimitiveDevBufPointers {
+	VertexIndex* dev_indices;
+	VertexAttributePosition* dev_position;
+	VertexAttributeNormal* dev_normal;
+	VertexAttributeTexcoord* dev_texcoord0;
+
+	//TODO: add more attributes when necessary
+};
+
+static std::map<std::string, std::vector<PrimitiveDevBufPointers>> mesh2PrimitivesMap;
+
 
 static int width = 0;
 static int height = 0;
@@ -113,37 +117,7 @@ void rasterizeInit(int w, int h) {
     checkCUDAError("rasterizeInit");
 }
 
-/**
- * Set all of the buffers necessary for rasterization.
- * Note: store bufferView as char* in device memory.
- */
-//void rasterizeSetBuffers(
-//        int _bufIdxSize, int *bufIdx,
-//        int _vertCount, float *bufPos, float *bufNor, float *bufCol) {
-//	bufIdxSize = _bufIdxSize;
-//	vertCount = _vertCount;
-//
-//	cudaFree(dev_bufIdx);
-//	cudaMalloc(&dev_bufIdx, bufIdxSize * sizeof(int));
-//	cudaMemcpy(dev_bufIdx, bufIdx, bufIdxSize * sizeof(int), cudaMemcpyHostToDevice);
-//
-//	VertexIn *bufVertex = new VertexIn[_vertCount];
-//	for (int i = 0; i < vertCount; i++) {
-//		int j = i * 3;
-//		bufVertex[i].pos = glm::vec3(bufPos[j + 0], bufPos[j + 1], bufPos[j + 2]);
-//		bufVertex[i].nor = glm::vec3(bufNor[j + 0], bufNor[j + 1], bufNor[j + 2]);
-//		bufVertex[i].col = glm::vec3(bufCol[j + 0], bufCol[j + 1], bufCol[j + 2]);
-//	}
-//	cudaFree(dev_bufVertex);
-//	cudaMalloc(&dev_bufVertex, vertCount * sizeof(VertexIn));
-//	cudaMemcpy(dev_bufVertex, bufVertex, vertCount * sizeof(VertexIn), cudaMemcpyHostToDevice);
-//
-//	cudaFree(dev_primitives);
-//	cudaMalloc(&dev_primitives, vertCount / 3 * sizeof(Triangle));
-//	cudaMemset(dev_primitives, 0, vertCount / 3 * sizeof(Triangle));
-//
-//	checkCUDAError("rasterizeSetBuffers");
-//}
+
 
 
 
@@ -165,26 +139,7 @@ void rasterizeInit(int w, int h) {
 
 
 
-struct PrimitiveDevBufPointers {
-	VertexIndex* dev_indices;
-	//VertexIn* dev_vertices;
-	VertexAttributePosition* dev_position;
-	VertexAttributeNormal* dev_normal;
-	VertexAttributeTexcoord* dev_texcoord0;
 
-	//TODO: add more attributes when necessary
-};
-
-
-
-//
-//static std::map<std::string, VertexAttributePosition*> mapBufferView2VertexAttributePosition;
-//
-
-// <mesh_name, vector<Primitives> >
-static std::map<std::string, std::vector<PrimitiveDevBufPointers>> mesh2PrimitiveVector;
-
-static std::map<std::string, PrimitiveDevBufPointers> primitiveDevPointers;
 
 
 __global__ 
@@ -240,7 +195,8 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 		for (; it != itEnd; it++) {
 			const tinygltf::Mesh & mesh = it->second;
 
-			std::pair<std::map<std::string, std::vector<PrimitiveDevBufPointers>>::iterator, bool> res = mesh2PrimitiveVector.insert(std::pair<std::string, std::vector<PrimitiveDevBufPointers>>(mesh.name, std::vector<PrimitiveDevBufPointers>()));
+			//std::pair<std::map<std::string, std::vector<PrimitiveDevBufPointers>>::iterator, bool> res = mesh2PrimitivesMap.insert(std::pair<std::string, std::vector<PrimitiveDevBufPointers>>(mesh.name, std::vector<PrimitiveDevBufPointers>()));
+			auto res = mesh2PrimitivesMap.insert(std::pair<std::string, std::vector<PrimitiveDevBufPointers>>(mesh.name, std::vector<PrimitiveDevBufPointers>()));
 			std::vector<PrimitiveDevBufPointers> & primitiveVector = (res.first)->second;
 
 			// for each primitive
@@ -318,9 +274,6 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 					std::string msg = "Set Attribute Buffer: " + it->first;
 					checkCUDAError(msg.c_str());
 				}
-
-
-
 
 
 				// ----------Indices-------------
@@ -413,11 +366,22 @@ void rasterize(uchar4 *pbo) {
  * Called once at the end of the program to free CUDA memory.
  */
 void rasterizeFree() {
-    cudaFree(dev_bufIdx);
-    dev_bufIdx = NULL;
 
-    cudaFree(dev_bufVertex);
-    dev_bufVertex = NULL;
+    // deconstruct primitives attribute/indices device buffer
+
+	auto it(mesh2PrimitivesMap.begin());
+	auto itEnd(mesh2PrimitivesMap.end());
+	for (; it != itEnd; ++it) {
+		for (auto p = it->second.begin(); p != it->second.end(); ++p) {
+			cudaFree(p->dev_indices);
+			cudaFree(p->dev_position);
+			cudaFree(p->dev_normal);
+			cudaFree(p->dev_texcoord0);
+			//TODO: release other attributes and materials
+		}
+	}
+
+	////////////
 
     cudaFree(dev_primitives);
     dev_primitives = NULL;
