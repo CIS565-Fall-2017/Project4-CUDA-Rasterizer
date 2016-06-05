@@ -14,8 +14,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <util/tiny_gltf_loader.h>
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+
 
 void rasterizeInit(int width, int height);
 void rasterizeSetBuffers(const tinygltf::Scene & scene);

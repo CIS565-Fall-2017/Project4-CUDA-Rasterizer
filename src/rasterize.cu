@@ -10,7 +10,8 @@
 
 #include <cmath>
 #include <cstdio>
-
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <thrust/random.h>
 #include <util/checkCUDAError.h>
 #include "rasterizeTools.h"
@@ -32,9 +33,9 @@ typedef glm::vec2 VertexAttributeTexcoord;
 
 
 enum PrimitiveType{
-	Triangle,
-	Line,
-	Point
+	Point = 1,
+	Line = 2,
+	Triangle = 3
 };
 
 struct Primitive {
@@ -47,10 +48,17 @@ struct Fragment {
 
 
 struct PrimitiveDevBufPointers {
+
+	int primitiveMode;	//from tinygltfloader
+	PrimitiveType primitiveType;
+	int numPrimitives;
+
 	VertexIndex* dev_indices;
 	VertexAttributePosition* dev_position;
 	VertexAttributeNormal* dev_normal;
 	VertexAttributeTexcoord* dev_texcoord0;
+
+
 
 	//TODO: add more attributes when necessary
 };
@@ -206,12 +214,76 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 				if (primitive.indices.empty())
 					return;
 
-
 				// TODO: ? now position, normal, etc data type is predefined
 				VertexIndex* dev_indices;
 				VertexAttributePosition* dev_position;
 				VertexAttributeNormal* dev_normal;
 				VertexAttributeTexcoord* dev_texcoord0;
+
+				// ----------Indices-------------
+
+				const tinygltf::Accessor &indexAccessor = scene.accessors.at(primitive.indices);
+				const tinygltf::BufferView &bufferView = scene.bufferViews.at(indexAccessor.bufferView);
+				char * dev_bufferView = bufferViewDevPointers.at(indexAccessor.bufferView);
+
+				// !! assume type is SCALAR
+				int n = 1;
+				int numIndices = indexAccessor.count;
+				int componentTypeByteSize = sizeof(VertexIndex);
+				int byteLength = numIndices * n * componentTypeByteSize;
+
+
+				cudaMalloc(&dev_indices, byteLength);
+
+				dim3 numBlocks(128);
+				dim3 numThreadsPerBlock((numIndices + numBlocks.x - 1) / numBlocks.x);
+				cudaMalloc(&dev_position, byteLength);
+				_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
+					(char*)dev_indices,
+					dev_bufferView,
+					indexAccessor.byteStride,
+					bufferView.byteOffset + indexAccessor.byteOffset,
+					componentTypeByteSize);
+
+
+				checkCUDAError("Set Index Buffer");
+
+
+				// ---------Primitive Info-------
+
+
+				// !! LINE_STRIP is not supported in tinygltfloader
+				int numPrimitives;
+				PrimitiveType primitiveType;
+				switch (primitive.mode) {
+				case TINYGLTF_MODE_TRIANGLES:
+					primitiveType = PrimitiveType::Triangle;
+					numPrimitives = numIndices / 3;
+					break;
+				case TINYGLTF_MODE_TRIANGLE_STRIP:
+					primitiveType = PrimitiveType::Triangle;
+					numPrimitives = numIndices - 2;
+					break;
+				case TINYGLTF_MODE_TRIANGLE_FAN:
+					primitiveType = PrimitiveType::Triangle;
+					numPrimitives = numIndices - 2;
+					break;
+				case TINYGLTF_MODE_LINE:
+					primitiveType = PrimitiveType::Line;
+					numPrimitives = numIndices / 2;
+					break;
+				case TINYGLTF_MODE_LINE_LOOP:
+					primitiveType = PrimitiveType::Line;
+					numPrimitives = numIndices + 1;
+					break;
+				case TINYGLTF_MODE_POINTS:
+					primitiveType = PrimitiveType::Point;
+					numPrimitives = numIndices;
+					break;
+				default:
+					// TODO: error
+					break;
+				};
 
 
 				// ----------Attributes-------------
@@ -276,36 +348,6 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 				}
 
 
-				// ----------Indices-------------
-
-				const tinygltf::Accessor &indexAccessor = scene.accessors.at(primitive.indices);
-				const tinygltf::BufferView &bufferView = scene.bufferViews.at(indexAccessor.bufferView);
-				char * dev_bufferView = bufferViewDevPointers.at(indexAccessor.bufferView);
-				
-				// !! assume type is SCALAR
-				int n = 1;
-				int numVertices = indexAccessor.count;
-				int componentTypeByteSize = sizeof(VertexIndex);
-				int byteLength = numVertices * n * componentTypeByteSize;
-
-				cudaMalloc(&dev_indices, byteLength);		
-
-				dim3 numBlocks(128);
-				dim3 numThreadsPerBlock((numVertices + numBlocks.x - 1) / numBlocks.x);
-				cudaMalloc(&dev_position, byteLength);
-				_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
-					(char*)dev_indices,
-					dev_bufferView,
-					indexAccessor.byteStride,
-					bufferView.byteOffset + indexAccessor.byteOffset,
-					componentTypeByteSize);
-
-				
-				checkCUDAError("Set Index Buffer");
-
-
-
-
 
 				// ----------Materials-------------
 				// TODO
@@ -314,6 +356,10 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 				// at the end of the for loop of primitive
 				// push dev pointers to map
 				primitiveVector.push_back(PrimitiveDevBufPointers{
+					primitive.mode,
+					primitiveType,
+					numPrimitives,
+
 					dev_indices,
 					dev_position,
 					dev_normal,
