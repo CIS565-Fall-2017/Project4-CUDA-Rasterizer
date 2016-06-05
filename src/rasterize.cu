@@ -16,14 +16,15 @@
 #include <util/checkCUDAError.h>
 #include "rasterizeTools.h"
 
-struct VertexIn {
-    glm::vec3 pos;
-    glm::vec3 nor;
-    glm::vec3 col;
-    // TODO (optional) add other vertex attributes (e.g. texture coordinates)
-};
+
 struct VertexOut {
-    // TODO
+	glm::vec4 pos;
+
+	glm::vec3 worldPos;
+	glm::vec3 worldNor;
+
+	//glm::vec3 col;
+	glm::vec2 texcoord0;
 };
 
 typedef unsigned short VertexIndex;
@@ -53,12 +54,14 @@ struct PrimitiveDevBufPointers {
 	PrimitiveType primitiveType;
 	int numPrimitives;
 
+	// Vertex In, const after loaded
 	VertexIndex* dev_indices;
 	VertexAttributePosition* dev_position;
 	VertexAttributeNormal* dev_normal;
 	VertexAttributeTexcoord* dev_texcoord0;
 
-
+	// Vertex Out, changing for each frame
+	VertexOut* dev_verticesOut;
 
 	//TODO: add more attributes when necessary
 };
@@ -68,13 +71,12 @@ static std::map<std::string, std::vector<PrimitiveDevBufPointers>> mesh2Primitiv
 
 static int width = 0;
 static int height = 0;
-static int *dev_bufIdx = NULL;
-//static VertexIn *dev_bufVertex = NULL;
+
+static int totalNumPrimitives = 0;
 static Primitive *dev_primitives = NULL;
 static Fragment *dev_depthbuffer = NULL;
 static glm::vec3 *dev_framebuffer = NULL;
-static int bufIdxSize = 0;
-static int vertCount = 0;
+
 
 /**
  * Kernel that writes the image to the OpenGL PBO directly.
@@ -151,14 +153,16 @@ void rasterizeInit(int w, int h) {
 
 
 __global__ 
-void _deviceBufferCopy(char* dev_dst, const char* dev_src, int byteStride, int byteOffset, int componentTypeByteSize) {
+void _deviceBufferCopy(int N, char* dev_dst, const char* dev_src, int byteStride, int byteOffset, int componentTypeByteSize) {
 	
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
-
-	for (int j = 0; j < componentTypeByteSize; j++) {
-		dev_dst[i + j] = dev_src[byteOffset + i * byteStride + j];
+	if (i < N) {
+		for (int j = 0; j < componentTypeByteSize; j++) {
+			dev_dst[i + j] = dev_src[byteOffset + i * byteStride + j];
+		}
 	}
+	
 
 }
 
@@ -239,6 +243,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 				dim3 numThreadsPerBlock((numIndices + numBlocks.x - 1) / numBlocks.x);
 				cudaMalloc(&dev_position, byteLength);
 				_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
+					numIndices,
 					(char*)dev_indices,
 					dev_bufferView,
 					indexAccessor.byteStride,
@@ -337,6 +342,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 					int byteLength = numVertices * n * componentTypeByteSize;
 					cudaMalloc(&dev_position, byteLength);
 					_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
+						numVertices,
 						dev_attribute,
 						dev_bufferView,
 						accessor.byteStride,
@@ -363,7 +369,9 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 					dev_indices,
 					dev_position,
 					dev_normal,
-					dev_texcoord0
+					dev_texcoord0,
+
+					NULL	//VertexOut
 				});
 			} // for each primitive
 
@@ -388,6 +396,56 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 
 }
+
+
+
+/**
+* for one primitive
+* ?? can combine with pritimitiveAssembly to make only one kernel call??
+*/
+__global__ 
+void _vertexTransformAndAssembly(int N, PrimitiveDevBufPointers primitive, glm::mat4 M) {
+	// TODO: delete for assignments
+
+	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (i < N) {
+		primitive.dev_verticesOut[i].pos = M * glm::vec4(primitive.dev_position[i], 1.0f);
+		primitive.dev_verticesOut[i].worldPos = primitive.dev_position[i];
+		primitive.dev_verticesOut[i].worldNor = primitive.dev_normal[i];
+		primitive.dev_verticesOut[i].texcoord0 = primitive.dev_texcoord0[i];
+	}
+}
+
+
+
+static int curPrimitiveBeginId = 0;
+
+__global__ 
+void primitiveAssembly(int N, PrimitiveDevBufPointers primitive) {
+	// TODO: delete for assignments
+
+	// TODO: output to dev_primitives
+	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	if (i < N) {
+		int temp;
+		if (primitive.primitiveMode == TINYGLTF_MODE_TRIANGLES) {
+			temp = i / (int)primitive.primitiveType;
+			dev_primitives[temp + curPrimitiveBeginId].v[temp % (int)primitive.primitiveType]
+				= primitive.dev_verticesOut[primitive.dev_indices[i]];
+		}
+	}
+	
+	// TODO: other primitive types
+}
+
+
+
+
+
+
+
+
 
 /**
  * Perform rasterization.
@@ -423,6 +481,7 @@ void rasterizeFree() {
 			cudaFree(p->dev_position);
 			cudaFree(p->dev_normal);
 			cudaFree(p->dev_texcoord0);
+			cudaFree(p->dev_verticesOut);
 			//TODO: release other attributes and materials
 		}
 	}
