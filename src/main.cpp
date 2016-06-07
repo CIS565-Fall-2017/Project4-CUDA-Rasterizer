@@ -175,9 +175,7 @@ bool init(const tinygltf::Scene & scene) {
 
 
 
-	rasterizeSetBuffers(mesh->getBufIdxsize(), mesh->getBufIdx(),
-		mesh->getBufPossize() / 3,
-		mesh->getBufPos(), mesh->getBufNor(), mesh->getBufCol());
+	rasterizeSetBuffers(scene);
 
     GLuint passthroughProgram;
     passthroughProgram = initShader();

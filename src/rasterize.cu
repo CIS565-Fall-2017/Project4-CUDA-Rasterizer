@@ -421,7 +421,7 @@ void _vertexTransformAndAssembly(int N, PrimitiveDevBufPointers primitive, glm::
 static int curPrimitiveBeginId = 0;
 
 __global__ 
-void primitiveAssembly(int N, PrimitiveDevBufPointers primitive) {
+void primitiveAssembly(int N, int curPrimitiveBeginId, Primitive* dev_primitives, PrimitiveDevBufPointers primitive) {
 	// TODO: delete for assignments
 
 	// TODO: output to dev_primitives
