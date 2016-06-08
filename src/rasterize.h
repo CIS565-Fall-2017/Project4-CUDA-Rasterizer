@@ -10,10 +10,9 @@
 
 #include <glm/glm.hpp>
 
-#define TINYGLTF_LOADER_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#include <util/tiny_gltf_loader.h>
-
+namespace tinygltf{
+	class Scene;
+}
 
 
 void rasterizeInit(int width, int height);

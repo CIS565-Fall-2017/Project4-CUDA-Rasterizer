@@ -6,7 +6,7 @@
  * @copyright University of Pennsylvania & STUDENT
  */
 
-#include "rasterize.h"
+
 
 #include <cmath>
 #include <cstdio>
@@ -16,6 +16,10 @@
 #include <util/checkCUDAError.h>
 #include "rasterizeTools.h"
 
+#include "rasterize.h"
+
+
+#include <util/tiny_gltf_loader.h>
 
 struct VertexOut {
 	glm::vec4 pos;
@@ -32,6 +36,7 @@ typedef glm::vec3 VertexAttributePosition;
 typedef glm::vec3 VertexAttributeNormal;
 typedef glm::vec2 VertexAttributeTexcoord;
 
+typedef unsigned char BufferByte;
 
 enum PrimitiveType{
 	Point = 1,
@@ -153,7 +158,7 @@ void rasterizeInit(int w, int h) {
 
 
 __global__ 
-void _deviceBufferCopy(int N, char* dev_dst, const char* dev_src, int byteStride, int byteOffset, int componentTypeByteSize) {
+void _deviceBufferCopy(int N, BufferByte* dev_dst, const BufferByte* dev_src, int byteStride, int byteOffset, int componentTypeByteSize) {
 	
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
@@ -169,7 +174,7 @@ void _deviceBufferCopy(int N, char* dev_dst, const char* dev_src, int byteStride
 
 void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
-	std::map<std::string, char*> bufferViewDevPointers;
+	std::map<std::string, BufferByte*> bufferViewDevPointers;
 
 	// 1. copy all `bufferViews` to device memory
 	{
@@ -179,6 +184,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 			scene.bufferViews.end());
 
 		for (; it != itEnd; it++) {
+			const std::string key = it->first;
 			const tinygltf::BufferView &bufferView = it->second;
 			if (bufferView.target == 0) {
 				continue; // Unsupported bufferView.
@@ -188,11 +194,13 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 			const tinygltf::Buffer &buffer = scene.buffers.at(bufferView.buffer);
 
 			// ? __constant__
-			char* dev_bufferView;
+			BufferByte* dev_bufferView;
 			cudaMalloc(&dev_bufferView, bufferView.byteLength);
 			cudaMemcpy(dev_bufferView, &buffer.data.front() + bufferView.byteOffset, bufferView.byteLength, cudaMemcpyHostToDevice);
 
-			bufferViewDevPointers.insert(std::pair<std::string, char*>(bufferView.name, dev_bufferView));
+			checkCUDAError("Copy BufferView");
+
+			bufferViewDevPointers.insert(std::make_pair(key, dev_bufferView));
 		}
 	}
 
@@ -228,7 +236,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 				const tinygltf::Accessor &indexAccessor = scene.accessors.at(primitive.indices);
 				const tinygltf::BufferView &bufferView = scene.bufferViews.at(indexAccessor.bufferView);
-				char * dev_bufferView = bufferViewDevPointers.at(indexAccessor.bufferView);
+				BufferByte* dev_bufferView = bufferViewDevPointers.at(indexAccessor.bufferView);
 
 				// !! assume type is SCALAR
 				int n = 1;
@@ -244,7 +252,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 				cudaMalloc(&dev_position, byteLength);
 				_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
 					numIndices,
-					(char*)dev_indices,
+					(BufferByte*)dev_indices,
 					dev_bufferView,
 					indexAccessor.byteStride,
 					bufferView.byteOffset + indexAccessor.byteOffset,
@@ -317,23 +325,23 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 						n = 4;
 					}
 
-					char * dev_bufferView = bufferViewDevPointers.at(accessor.bufferView);
-					char * dev_attribute;
+					BufferByte * dev_bufferView = bufferViewDevPointers.at(accessor.bufferView);
+					BufferByte * dev_attribute;
 					
 					int numVertices = accessor.count;
 					int componentTypeByteSize;
 
 					if (it->first.compare("POSITION") == 0) {
 						componentTypeByteSize = sizeof(VertexAttributePosition);
-						dev_attribute = (char*)dev_position;
+						dev_attribute = (BufferByte*)dev_position;
 					} 
 					else if (it->first.compare("NORMAL") == 0) {
 						componentTypeByteSize = sizeof(VertexAttributeNormal);
-						dev_attribute = (char*)dev_normal;
+						dev_attribute = (BufferByte*)dev_normal;
 					}
 					else if (it->first.compare("TEXCOORD_0") == 0) {
 						componentTypeByteSize = sizeof(VertexAttributeTexcoord);
-						dev_attribute = (char*)dev_texcoord0;
+						dev_attribute = (BufferByte*)dev_texcoord0;
 					}
 
 
@@ -384,8 +392,8 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 	// Finally, cudaFree raw dev_bufferViews
 	{
 
-		std::map<std::string, char*>::const_iterator it(bufferViewDevPointers.begin());
-		std::map<std::string, char*>::const_iterator itEnd(bufferViewDevPointers.end());
+		std::map<std::string, BufferByte*>::const_iterator it(bufferViewDevPointers.begin());
+		std::map<std::string, BufferByte*>::const_iterator itEnd(bufferViewDevPointers.end());
 			
 			//bufferViewDevPointers
 

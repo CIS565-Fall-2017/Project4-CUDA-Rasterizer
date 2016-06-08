@@ -8,8 +8,6 @@ set(SOURCE_FILES
     "obj.cpp"
     "objloader.hpp"
     "objloader.cpp"
-    "picojson.h"
-    "stb_image.h"
     "tiny_gltf_loader.h"
    )
 
