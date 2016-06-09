@@ -155,8 +155,9 @@ void rasterizeInit(int w, int h) {
 
 
 
-
-
+/**
+* kern function with support for stride to sometimes replace cudaMemcpy
+*/
 __global__ 
 void _deviceBufferCopy(int N, BufferByte* dev_dst, const BufferByte* dev_src, int byteStride, int byteOffset, int componentTypeByteSize) {
 	
