@@ -198,7 +198,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 			cudaMalloc(&dev_bufferView, bufferView.byteLength);
 			cudaMemcpy(dev_bufferView, &buffer.data.front() + bufferView.byteOffset, bufferView.byteLength, cudaMemcpyHostToDevice);
 
-			checkCUDAError("Copy BufferView");
+			checkCUDAError("Set BufferView Device Mem");
 
 			bufferViewDevPointers.insert(std::make_pair(key, dev_bufferView));
 		}
@@ -326,32 +326,32 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 					}
 
 					BufferByte * dev_bufferView = bufferViewDevPointers.at(accessor.bufferView);
-					BufferByte * dev_attribute;
+					BufferByte ** dev_attribute = NULL;
 					
 					int numVertices = accessor.count;
 					int componentTypeByteSize;
 
 					if (it->first.compare("POSITION") == 0) {
 						componentTypeByteSize = sizeof(VertexAttributePosition);
-						dev_attribute = (BufferByte*)dev_position;
+						dev_attribute = (BufferByte**)&dev_position;
 					} 
 					else if (it->first.compare("NORMAL") == 0) {
 						componentTypeByteSize = sizeof(VertexAttributeNormal);
-						dev_attribute = (BufferByte*)dev_normal;
+						dev_attribute = (BufferByte**)&dev_normal;
 					}
 					else if (it->first.compare("TEXCOORD_0") == 0) {
 						componentTypeByteSize = sizeof(VertexAttributeTexcoord);
-						dev_attribute = (BufferByte*)dev_texcoord0;
+						dev_attribute = (BufferByte**)&dev_texcoord0;
 					}
 
 
 					dim3 numBlocks(128);
 					dim3 numThreadsPerBlock((numVertices + numBlocks.x - 1) / numBlocks.x);
 					int byteLength = numVertices * n * componentTypeByteSize;
-					cudaMalloc(&dev_position, byteLength);
+					cudaMalloc(dev_attribute, byteLength);
 					_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
 						numVertices,
-						dev_attribute,
+						*dev_attribute,
 						dev_bufferView,
 						accessor.byteStride,
 						bufferView.byteOffset + accessor.byteOffset,
@@ -400,6 +400,8 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 		for (; it != itEnd; it++) {
 			cudaFree(it->second);
 		}
+
+		checkCUDAError("Free BufferView Device Mem");
 	}
 
 
