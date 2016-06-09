@@ -2,7 +2,7 @@
  * @file      rasterize.cu
  * @brief     CUDA-accelerated rasterization pipeline.
  * @authors   Skeleton code: Yining Karl Li, Kai Ninomiya, Shuai Shao (Shrek)
- * @date      2012-2015
+ * @date      2012-2016
  * @copyright University of Pennsylvania & STUDENT
  */
 
@@ -52,12 +52,12 @@ struct Fragment {
     glm::vec3 color;
 };
 
-
 struct PrimitiveDevBufPointers {
-
-	int primitiveMode;	//from tinygltfloader
+	int primitiveMode;	//from tinygltfloader macro
 	PrimitiveType primitiveType;
 	int numPrimitives;
+	int numIndices;
+	int numVertices;
 
 	// Vertex In, const after loaded
 	VertexIndex* dev_indices;
@@ -175,6 +175,8 @@ void _deviceBufferCopy(int N, BufferByte* dev_dst, const BufferByte* dev_src, in
 
 void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
+	totalNumPrimitives = 0;
+
 	std::map<std::string, BufferByte*> bufferViewDevPointers;
 
 	// 1. copy all `bufferViews` to device memory
@@ -248,8 +250,8 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 				cudaMalloc(&dev_indices, byteLength);
 
-				dim3 numBlocks(128);
-				dim3 numThreadsPerBlock((numIndices + numBlocks.x - 1) / numBlocks.x);
+				dim3 numThreadsPerBlock(128);
+				dim3 numBlocks((numIndices + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
 				cudaMalloc(&dev_position, byteLength);
 				_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
 					numIndices,
@@ -307,6 +309,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 				//std::map<std::string, std::string>::const_iterator itEnd(primitive.attributes.end());
 				auto itEnd(primitive.attributes.end());
 
+				int numVertices = 0;
 				// for each attribute
 				for (; it != itEnd; it++) {
 					const tinygltf::Accessor &accessor = scene.accessors.at(it->second);
@@ -329,7 +332,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 					BufferByte * dev_bufferView = bufferViewDevPointers.at(accessor.bufferView);
 					BufferByte ** dev_attribute = NULL;
 					
-					int numVertices = accessor.count;
+					numVertices = accessor.count;
 					int componentTypeByteSize;
 
 					if (it->first.compare("POSITION") == 0) {
@@ -346,8 +349,8 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 					}
 
 
-					dim3 numBlocks(128);
-					dim3 numThreadsPerBlock((numVertices + numBlocks.x - 1) / numBlocks.x);
+					dim3 numThreadsPerBlock(128);
+					dim3 numBlocks((numVertices + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
 					int byteLength = numVertices * n * componentTypeByteSize;
 					cudaMalloc(dev_attribute, byteLength);
 					_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
@@ -362,7 +365,10 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 					checkCUDAError(msg.c_str());
 				}
 
-
+				// malloc for VertexOut
+				VertexOut* dev_vertexOut;
+				cudaMalloc(&dev_vertexOut, numVertices * sizeof(VertexOut));
+				checkCUDAError("Malloc VertexOut Buffer");
 
 				// ----------Materials-------------
 				// TODO
@@ -374,20 +380,32 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 					primitive.mode,
 					primitiveType,
 					numPrimitives,
+					numIndices,
+					numVertices,
 
 					dev_indices,
 					dev_position,
 					dev_normal,
 					dev_texcoord0,
 
-					NULL	//VertexOut
+					dev_vertexOut	//VertexOut
 				});
+
+				totalNumPrimitives += numPrimitives;
+
 			} // for each primitive
 
 		} // for each mesh
 
 	}
 	
+
+	// 3. Malloc for dev_primitives
+	{
+		cudaMalloc(&dev_primitives, totalNumPrimitives * sizeof(Primitive));
+	}
+	
+
 
 
 	// Finally, cudaFree raw dev_bufferViews
@@ -415,15 +433,16 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 * ?? can combine with pritimitiveAssembly to make only one kernel call??
 */
 __global__ 
-void _vertexTransformAndAssembly(int N, PrimitiveDevBufPointers primitive, glm::mat4 M) {
+void _vertexTransformAndAssembly(int numVertices, PrimitiveDevBufPointers primitive, glm::mat4 M) {
 	// TODO: delete for assignments
 
-	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if (i < N) {
-		primitive.dev_verticesOut[i].pos = M * glm::vec4(primitive.dev_position[i], 1.0f);
-		primitive.dev_verticesOut[i].worldPos = primitive.dev_position[i];
-		primitive.dev_verticesOut[i].worldNor = primitive.dev_normal[i];
-		primitive.dev_verticesOut[i].texcoord0 = primitive.dev_texcoord0[i];
+	// vertex id
+	int vid = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (vid < numVertices) {
+		primitive.dev_verticesOut[vid].pos = M * glm::vec4(primitive.dev_position[vid], 1.0f);
+		primitive.dev_verticesOut[vid].worldPos = primitive.dev_position[vid];
+		primitive.dev_verticesOut[vid].worldNor = primitive.dev_normal[vid];
+		primitive.dev_verticesOut[vid].texcoord0 = primitive.dev_texcoord0[vid];
 	}
 }
 
@@ -432,18 +451,18 @@ void _vertexTransformAndAssembly(int N, PrimitiveDevBufPointers primitive, glm::
 static int curPrimitiveBeginId = 0;
 
 __global__ 
-void primitiveAssembly(int N, int curPrimitiveBeginId, Primitive* dev_primitives, PrimitiveDevBufPointers primitive) {
+void _primitiveAssembly(int numIndices, int curPrimitiveBeginId, Primitive* dev_primitives, PrimitiveDevBufPointers primitive) {
 	// TODO: delete for assignments
 
-	// TODO: output to dev_primitives
-	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
+	// index id
+	int iid = (blockIdx.x * blockDim.x) + threadIdx.x;
 
-	if (i < N) {
-		int temp;
+	if (iid < numIndices) {
+		int pid;	//id for cur primitives vector
 		if (primitive.primitiveMode == TINYGLTF_MODE_TRIANGLES) {
-			temp = i / (int)primitive.primitiveType;
-			dev_primitives[temp + curPrimitiveBeginId].v[temp % (int)primitive.primitiveType]
-				= primitive.dev_verticesOut[primitive.dev_indices[i]];
+			pid = iid / (int)primitive.primitiveType;
+			dev_primitives[pid + curPrimitiveBeginId].v[iid % (int)primitive.primitiveType]
+				= primitive.dev_verticesOut[primitive.dev_indices[iid]];
 		}
 	}
 	
@@ -465,10 +484,59 @@ void rasterize(uchar4 *pbo) {
     int sideLength2d = 8;
     dim3 blockSize2d(sideLength2d, sideLength2d);
     dim3 blockCount2d((width  - 1) / blockSize2d.x + 1,
-                      (height - 1) / blockSize2d.y + 1);
+		(height - 1) / blockSize2d.y + 1);
 
-    // TODO: Execute your rasterization pipeline here
-    // (See README for rasterization pipeline outline.)
+	// TODO: Execute your rasterization pipeline here
+	// (See README for rasterization pipeline outline.)
+
+
+	//temp
+	glm::mat4 MVP;
+	float scale = 0.15f;
+	MVP = glm::frustum<float>(-scale * ((float)width) / ((float)height),
+		scale * ((float)width / (float)height),
+		-scale, scale, 1.0, 1000.0);
+
+	// Vertex Process & primitive assembly
+	{
+		curPrimitiveBeginId = 0;
+		dim3 numThreadsPerBlock(128);
+
+		auto it = mesh2PrimitivesMap.begin();
+		auto itEnd = mesh2PrimitivesMap.end();
+
+		for (; it != itEnd; ++it) {
+			auto p = (it->second).begin();	// each primitive
+			auto pEnd = (it->second).end();
+			for (; p != pEnd; ++p) {
+				dim3 numBlocksForVertices((p->numVertices + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
+				dim3 numBlocksForIndices((p->numIndices + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
+
+				_vertexTransformAndAssembly << < numBlocksForVertices, numThreadsPerBlock >> >(p->numVertices, *p, MVP);
+				checkCUDAError("Vertex Processing");
+				cudaDeviceSynchronize();
+				_primitiveAssembly << < numBlocksForIndices, numThreadsPerBlock >> >
+					(p->numIndices, 
+					curPrimitiveBeginId, 
+					dev_primitives, 
+					*p);
+				checkCUDAError("Primitive Assembly");
+
+				curPrimitiveBeginId += p->numPrimitives;
+			}
+		}
+
+		checkCUDAError("Vertex Processing and Primitive Assembly");
+	}
+	
+	// Rasterize: temp test
+	{
+		//dim3 blockSize_Rasterize(64);
+		//dim3 blockCount_tri((triCount + blockSize_Rasterize.x - 1) / blockSize_Rasterize.x);
+		//kernScanLineForOneTriangle << <blockCount_tri, blockSize_Rasterize >> >(cur_triCount, width, height, dev_primitives, dev_depthbuffer, dev_depth, geomMode);
+	}
+
+
 
     // Copy depthbuffer colors into framebuffer
     render<<<blockCount2d, blockSize2d>>>(width, height, dev_depthbuffer, dev_framebuffer);
