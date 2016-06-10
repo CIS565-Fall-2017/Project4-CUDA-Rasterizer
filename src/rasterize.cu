@@ -239,10 +239,6 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 			bufferViewDevPointers.insert(std::make_pair(key, dev_bufferView));
 
-			//!!!!!!!!!TODO: delete test
-			cudaDeviceSynchronize();
-			std::vector<BufferByte> bufferViewWatch(bufferView.byteLength);
-			cudaMemcpy(&bufferViewWatch.at(0), dev_bufferView, bufferView.byteLength, cudaMemcpyDeviceToHost);
 		}
 	}
 
@@ -294,7 +290,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 					(BufferByte*)dev_indices,
 					dev_bufferView,
 					indexAccessor.byteStride,
-					bufferView.byteOffset + indexAccessor.byteOffset,
+					indexAccessor.byteOffset,
 					componentTypeByteSize);
 
 
@@ -398,7 +394,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 						*dev_attribute,
 						dev_bufferView,
 						accessor.byteStride,
-						bufferView.byteOffset + accessor.byteOffset,
+						accessor.byteOffset,
 						componentTypeByteSize);
 
 					std::string msg = "Set Attribute Buffer: " + it->first;
@@ -642,8 +638,9 @@ void drawOneScanLine(int width, const Edge & e1, const Edge & e2, int y,
 		VertexOut p;
 		//p.pos = u.x * tri.v[0].pos + u.y * tri.v[1].pos + u.z * tri.v[2].pos;
 		//p.pos.w = u.x * tri.v[0].pos.w + u.y * tri.v[1].pos.w + u.z * tri.v[2].pos.w;
-		p.pos = u.x / tri.v[0].pos + u.y / tri.v[1].pos + u.z / tri.v[2].pos;
-		p.pos.w = u.x / tri.v[0].pos.w + u.y / tri.v[1].pos.w + u.z / tri.v[2].pos.w;
+		p.pos = u.x * tri.v[0].pos + u.y * tri.v[1].pos + u.z * tri.v[2].pos;
+		p.eyeNor = u.x * tri.v[0].eyeNor + u.y * tri.v[1].eyeNor + u.z * tri.v[2].eyeNor;
+		//p.pos.w = u.x * tri.v[0].pos.w + u.y * tri.v[1].pos.w + u.z * tri.v[2].pos.w;
 
 		int z_int = (int)(z * INT_MAX);
 
@@ -654,8 +651,13 @@ void drawOneScanLine(int width, const Edge & e1, const Edge & e2, int y,
 		if (*address == z_int)
 		{
 			//fragments[idx].depth = z;
-			//fragments[idx].color = glm::vec3(p.pos.w);
-			fragments[idx].color = glm::vec3(1.0f, 1.0f, 1.0f);
+			//fragments[idx].color = glm::vec3(p.pos.z);
+
+			//fragments[idx].color = glm::vec3(p.pos.z);
+
+			fragments[idx].color = p.eyeNor;
+
+			//fragments[idx].color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 			//fragments[idx].has_fragment = true;
 

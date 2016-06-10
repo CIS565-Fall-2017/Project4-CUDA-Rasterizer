@@ -103,21 +103,36 @@ void mainLoop() {
 //---------RUNTIME STUFF---------
 //-------------------------------
 float scale = 1.0f;
+float x_trans = 0.0f, y_trans = 0.0f, z_trans = -10.0f;
+float x_angle = 0.0f, y_angle = 0.0f;
 void runCuda() {
     // Map OpenGL buffer object for writing from CUDA on a single GPU
     // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
     dptr = NULL;
 
 	//temp
-	glm::mat4 MVP;
 	
-	MVP = glm::frustum<float>(-scale * ((float)width) / ((float)height),
+	
+	glm::mat4 P = glm::frustum<float>(-scale * ((float)width) / ((float)height),
 		scale * ((float)width / (float)height),
-		-scale, scale, 1.0, 1000.0) * glm::translate(glm::vec3(0, 0, -10.0f));
-	scale += 0.01f;
+		-scale, scale, 1.0, 1000.0);
+
+	glm::mat4 V = glm::mat4(1.0f);
+
+	glm::mat4 M =
+		glm::translate(glm::vec3(x_trans, y_trans, z_trans))
+		* glm::rotate(x_angle, glm::vec3(1.0f, 0.0f, 0.0f))
+		* glm::rotate(y_angle, glm::vec3(0.0f, 1.0f, 0.0f));
+	
+	glm::mat3 MV_normal = glm::transpose(glm::inverse(glm::mat3(V) * glm::mat3(M)));
+
+	
+	glm::mat4 MV = V * M;
+	glm::mat4 MVP = P * MV;
+
 
     cudaGLMapBufferObject((void **)&dptr, pbo);
-    rasterize(dptr, MVP, MVP, glm::mat3(MVP));
+	rasterize(dptr, MVP, MV, MV_normal);
     cudaGLUnmapBufferObject(pbo);
 
     frame++;
@@ -163,6 +178,16 @@ bool init(const tinygltf::Scene & scene) {
 	//    0.0, 0.0, 1.0,
 	//    1.0, 0.0, 0.0
 	//};
+
+
+	// !!!!! TODO: delete me! for assignments
+
+	//MY Mouse Control
+	glfwSetMouseButtonCallback(window, mouseButtonCallback);
+	glfwSetCursorPosCallback(window, mouseMotionCallback);
+
+
+	glfwSetScrollCallback(window, mouseWheelCallback);
 
 	{
 		std::map<std::string, std::vector<std::string> >::const_iterator it(
@@ -343,4 +368,72 @@ static std::string getFilePathExtension(const std::string &FileName) {
 	if (FileName.find_last_of(".") != std::string::npos)
 		return FileName.substr(FileName.find_last_of(".") + 1);
 	return "";
+}
+
+
+
+
+
+
+
+
+
+
+// !!!!!  TODO: delete me !!!!!
+// mouse control
+
+enum ControlState { NONE = 0, ROTATE, TRANSLATE };
+ControlState mouseState = NONE;
+void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+{
+	if (action == GLFW_PRESS)
+	{
+		if (button == GLFW_MOUSE_BUTTON_LEFT)
+		{
+			mouseState = ROTATE;
+		}
+		else if (button == GLFW_MOUSE_BUTTON_RIGHT)
+		{
+			mouseState = TRANSLATE;
+		}
+
+	}
+	else if (action == GLFW_RELEASE)
+	{
+		mouseState = NONE;
+	}
+	//printf("%d\n", mouseState);
+}
+
+double lastx = (double)width / 2;
+double lasty = (double)height / 2;
+void mouseMotionCallback(GLFWwindow* window, double xpos, double ypos)
+{
+	const double s_r = 0.01;
+	const double s_t = 0.01;
+
+	double diffx = xpos - lastx;
+	double diffy = ypos - lasty;
+	lastx = xpos;
+	lasty = ypos;
+
+	if (mouseState == ROTATE)
+	{
+		//rotate
+		x_angle += (float)s_r * diffy;
+		y_angle += (float)s_r * diffx;
+	}
+	else if (mouseState == TRANSLATE)
+	{
+		//translate
+		x_trans += (float)(s_t * diffx);
+		y_trans += (float)(-s_t * diffy);
+	}
+}
+
+void mouseWheelCallback(GLFWwindow* window, double xoffset, double yoffset)
+{
+	const double s_s = 0.01;
+
+	scale += (float)(-s_s * yoffset);
 }

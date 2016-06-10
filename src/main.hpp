@@ -101,3 +101,8 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
 //----- util -----------------
 //----------------------------
 std::string getFilePathExtension(const std::string &FileName);
+
+
+void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+void mouseMotionCallback(GLFWwindow* window, double xpos, double ypos);
+void mouseWheelCallback(GLFWwindow* window, double xoffset, double yoffset);
