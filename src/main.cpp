@@ -102,14 +102,22 @@ void mainLoop() {
 //-------------------------------
 //---------RUNTIME STUFF---------
 //-------------------------------
-
+float scale = 1.0f;
 void runCuda() {
     // Map OpenGL buffer object for writing from CUDA on a single GPU
     // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
     dptr = NULL;
 
+	//temp
+	glm::mat4 MVP;
+	
+	MVP = glm::frustum<float>(-scale * ((float)width) / ((float)height),
+		scale * ((float)width / (float)height),
+		-scale, scale, 1.0, 1000.0) * glm::translate(glm::vec3(0, 0, -10.0f));
+	scale += 0.01f;
+
     cudaGLMapBufferObject((void **)&dptr, pbo);
-    rasterize(dptr);
+    rasterize(dptr, MVP, MVP, glm::mat3(MVP));
     cudaGLUnmapBufferObject(pbo);
 
     frame++;
