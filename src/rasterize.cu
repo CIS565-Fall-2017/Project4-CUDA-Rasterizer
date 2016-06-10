@@ -296,10 +296,6 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 				checkCUDAError("Set Index Buffer");
 
-				//!!!!!!!!!TODO: delete test
-				cudaDeviceSynchronize();
-				std::vector<VertexIndex> indicesWatch(numIndices);
-				cudaMemcpy(&indicesWatch.at(0), dev_indices, numIndices*sizeof(VertexIndex), cudaMemcpyDeviceToHost);
 
 				// ---------Primitive Info-------
 
@@ -765,9 +761,6 @@ void kernScanLineForOneTriangle(int num_tri, int width, int height
 			&& tri.v[i].pos.y < (float)height && tri.v[i].pos.y >= 0)
 		{
 			outside = false;
-			// test------------------------------------
-			int idx = tri.v[i].pos.x + tri.v[i].pos.y * width;
-			depth_fragment[idx].color = glm::vec3(1.0f, 1.0f, 1.0f);
 			//printf("%d", triangleId);
 		}
 	}
@@ -872,16 +865,6 @@ void rasterize(uchar4 *pbo, const glm::mat4 & MVP, const glm::mat4 & MV, const g
 		}
 
 		checkCUDAError("Vertex Processing and Primitive Assembly");
-
-
-
-		// test, copy back to host memory
-		std::vector<Primitive> hst_primitives(totalNumPrimitives);
-		cudaMemcpy(&hst_primitives.at(0), dev_primitives, totalNumPrimitives * sizeof(Primitive), cudaMemcpyDeviceToHost);
-		checkCUDAError("mem test");
-
-		
-		
 	}
 	
 	// !!!!!!!!!!!!!!!!Rasterize: temp test
