@@ -472,19 +472,19 @@ void _vertexTransformAndAssembly(int numVertices, PrimitiveDevBufPointers primit
 	int vid = (blockIdx.x * blockDim.x) + threadIdx.x;
 	if (vid < numVertices) {
 		primitive.dev_verticesOut[vid].pos = MVP * glm::vec4(primitive.dev_position[vid], 1.0f);
-		glm::vec4 temp = MV * glm::vec4(primitive.dev_position[vid], 1.0f);
-		primitive.dev_verticesOut[vid].eyePos = glm::vec3(temp) / temp.w;
-		primitive.dev_verticesOut[vid].eyeNor = MV_normal * primitive.dev_normal[vid];
-		//primitive.dev_verticesOut[vid].texcoord0 = primitive.dev_texcoord0[vid];
 
 		// clipping space (to NDC -1,1) to viewport
 		glm::vec4 & pos = primitive.dev_verticesOut[vid].pos;
-		pos.x = 0.5f * (float)width * (pos.x / pos.w + 1.0f);
-		pos.y = 0.5f * (float)height * (pos.y / pos.w + 1.0f);
-		pos.z = 0.5f * (pos.z / pos.w + 1.0f);
+		pos.w = 1.0f / pos.w; // 1/w
+		pos.x = 0.5f * (float)width * (pos.x * pos.w + 1.0f);
+		pos.y = 0.5f * (float)height * (pos.y * pos.w + 1.0f);
+		pos.z = 0.5f * (pos.z * pos.w + 1.0f);
 
 		//perspective correct interpolation
-		primitive.dev_verticesOut[vid].texcoord0 = primitive.dev_texcoord0[vid] / pos.w;
+		glm::vec4 temp = MV * glm::vec4(primitive.dev_position[vid], 1.0f);
+		primitive.dev_verticesOut[vid].eyePos = glm::vec3(temp) / temp.w * pos.w;
+		primitive.dev_verticesOut[vid].eyeNor = MV_normal * primitive.dev_normal[vid] * pos.w;
+		primitive.dev_verticesOut[vid].texcoord0 = primitive.dev_texcoord0[vid] * pos.w;
 	}
 }
 
@@ -636,6 +636,8 @@ void drawOneScanLine(int width, const Edge & e1, const Edge & e2, int y,
 		//p.pos.w = u.x * tri.v[0].pos.w + u.y * tri.v[1].pos.w + u.z * tri.v[2].pos.w;
 		p.pos = u.x * tri.v[0].pos + u.y * tri.v[1].pos + u.z * tri.v[2].pos;
 		p.eyeNor = u.x * tri.v[0].eyeNor + u.y * tri.v[1].eyeNor + u.z * tri.v[2].eyeNor;
+		p.eyePos = u.x * tri.v[0].eyePos + u.y * tri.v[1].eyePos + u.z * tri.v[2].eyePos;
+		p.texcoord0 = u.x * tri.v[0].texcoord0 + u.y * tri.v[1].texcoord0 + u.z * tri.v[2].texcoord0;
 		//p.pos.w = u.x * tri.v[0].pos.w + u.y * tri.v[1].pos.w + u.z * tri.v[2].pos.w;
 
 		int z_int = (int)(z * INT_MAX);
@@ -651,7 +653,8 @@ void drawOneScanLine(int width, const Edge & e1, const Edge & e2, int y,
 
 			//fragments[idx].color = glm::vec3(p.pos.z);
 
-			fragments[idx].color = p.eyeNor;
+			fragments[idx].color = p.eyeNor / p.pos.w;
+			//fragments[idx].color = glm::vec3(p.texcoord0 / p.pos.w, 0.0f);
 
 			//fragments[idx].color = glm::vec3(1.0f, 1.0f, 1.0f);
 
