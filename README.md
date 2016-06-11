@@ -1,7 +1,7 @@
 CUDA Rasterizer
 ===============
 
-[Click here for instruction of this project](./INSTRUCTION.md)
+[CLICK ME FOR INSTRUCTION OF THIS PROJECT](./INSTRUCTION.md)
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 4**
 
@@ -16,4 +16,4 @@ project, and we will not be able to grade you without a good README.
 
 ### Credits
 
-* [tinygltfloader](https://github.com/syoyo/tinygltfloader) by @soyoyo
+* [tinygltfloader](https://github.com/syoyo/tinygltfloader) by [@soyoyo](https://github.com/syoyo)

@@ -1,7 +1,7 @@
 Instructions - CUDA-RASTERIZER
 ========================
 
-This is due Sunday, October 11, evening at midnight.
+This is due **TBD: Sunday, October 11, evening at midnight**.
 
 **Summary:** 
 In this project, you will use CUDA to implement a simplified
@@ -10,7 +10,7 @@ implement vertex shading, primitive assembly, rasterization, fragment shading,
 and a framebuffer. More information about the rasterized graphics pipeline can
 be found in the class slides and in the CIS 560 lecture notes.
 
-The base code provided includes an OBJ loader and much of the I/O and
+The base code provided includes an glTF loader (tinygltfloader) and much of the I/O and
 bookkeeping code. It also includes some functions that you may find useful,
 described below. The core rasterization pipeline is left for you to implement.
 
@@ -28,25 +28,17 @@ bunch of them around so you can pick a few to document your progress.
 
 * `src/` C++/CUDA source files.
 * `util/` C++ utility files.
-* `objs/` Example OBJ test files (# verts, # tris in buffers after loading)
-  * `tri.obj` (3v, 1t): The simplest possible geometric object.
-  * `cube.obj` (36v, 12t): A small model with low depth-complexity.
-  * `suzanne.obj` (2904 verts, 968 tris): A medium model with low depth-complexity.
-  * `suzanne_smooth.obj` (2904 verts, 968 tris): A medium model with low depth-complexity.
-    This model has normals which must be interpolated.
-  * `cow.obj` (17412 verts, 5804 tris): A large model with low depth-complexity.
-  * `cow_smooth.obj` (17412 verts, 5804 tris): A large model with low depth-complexity.
-    This model has normals which must be interpolated.
-  * `flower.obj` (1920 verts, 640 tris): A medium model with very high depth-complexity.
-  * `sponza.obj` (837,489 verts, 279,163 tris): A huge model with very high depth-complexity.
-* `renders/` Debug render of an example OBJ.
+* `gltfs/` Example OBJ test files (# verts, # tris in buffers after loading)
+  * `gltfs/box/box.gltf` (8v, 12t)
+  * TODO
+* `renders/` Test implementation render result of duck.gltf.
 * `external/` Includes and static libraries for 3rd party libraries.
 
 ### Running the code
 
 The main function requires a scene description file. Call the program with
-one as an argument: `cis565_rasterizer objs/cow.obj`.
-(In Visual Studio, `../objs/cow.obj`.)
+one as an argument: `cis565_rasterizer gltfs/duck/duck.gltf`.
+(In Visual Studio, `../gltfs/duck/duck.gltf`.)
 
 If you are using Visual Studio, you can set this in the Debugging > Command
 Arguments section in the Project properties. Note that this value is different
@@ -59,18 +51,15 @@ the console for errors.
 
 In this project, you are given the following code:
 
-* A library for loading standard Alias/Wavefront `.obj` format mesh
-  files and converting them to OpenGL-style buffers of index and vertex data.
-  * This library does NOT read materials, and provides all colors as white by
-    default. You can use another library if you wish.
+* A tiny glTF loader for loading glTF format models and converting them to 
+OpenGL-style buffers of index and attribute data.
 * Simple structs for some parts of the pipeline.
-* Depth buffer to framebuffer copy.
+* Fragment buffer to framebuffer copy.
 * CUDA-GL interop.
 
 You will need to implement the following features/pipeline stages:
 
-* Vertex shading.
-* (Vertex shader) perspective transformation.
+* Vertex shading and perspective transformation.
 * Primitive assembly with support for triangles read from buffers of index and
   vertex data.
 * Rasterization.
@@ -105,7 +94,6 @@ You are also required to implement at least 3.0 "points" worth in extra features
 * (1.0) Anti-aliasing.
 * (1.0) Occlusion queries.
 * (1.0) Order-independent translucency using a k-buffer.
-* (0.5) **Mouse**-based interactive camera support.
 
 This extra feature list is not comprehensive. If you have a particular idea
 you would like to implement, please **contact us first**.
@@ -126,7 +114,8 @@ You will be working primarily in two files: `rasterize.cu`, and
 marked with a `TODO` comment. Areas that are useful to and serve as hints for
 optional features are marked with `TODO (Optional)`. Functions that are useful
 for reference are marked with the comment `CHECKITOUT`. **You should look at
-all TODOs and CHECKITOUTs before starting!** There are not many.
+all TODOs and CHECKITOUTs before starting!** There are not many 
+(Or not, as long as you are clear of the pipeline and design of a rasterizer).
 
 * `src/rasterize.cu` contains the core rasterization pipeline. 
   * A few pre-made structs are included for you to use, but those marked with
@@ -153,9 +142,9 @@ to write a minimal amount of code as described here. Verify some output after
 implementing each pipeline step. This will reduce the necessary time spent
 debugging.
 
-Start out by testing a single triangle (`tri.obj`).
+Start out by testing a single triangle (`box.gltf`).
 
-* Clear the depth buffer with some default value.
+* Clear the fragment buffer with some default value.
 * Vertex shading: 
   * `VertexIn[n] vs_input -> VertexOut[n] vs_output`
   * A minimal vertex shader will apply no transformations at all - it draws
