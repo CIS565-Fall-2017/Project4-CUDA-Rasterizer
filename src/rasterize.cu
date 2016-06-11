@@ -23,20 +23,11 @@
 
 namespace {
 
-	struct VertexOut {
-		glm::vec4 pos;
-
-		glm::vec3 eyePos;	// for shading
-		glm::vec3 eyeNor;	// normal will go wrong after perspective transform
-
-		//glm::vec3 col;
-		glm::vec2 texcoord0;
-	};
-
 	typedef unsigned short VertexIndex;
 	typedef glm::vec3 VertexAttributePosition;
 	typedef glm::vec3 VertexAttributeNormal;
 	typedef glm::vec2 VertexAttributeTexcoord;
+	typedef unsigned char TextureData;
 
 	typedef unsigned char BufferByte;
 
@@ -46,12 +37,33 @@ namespace {
 		Triangle = 3
 	};
 
+	struct VertexOut {
+		glm::vec4 pos;
+
+		glm::vec3 eyePos;	// for shading
+		glm::vec3 eyeNor;	// normal will go wrong after perspective transform
+
+		//glm::vec3 col;
+		glm::vec2 texcoord0;
+
+		TextureData* dev_diffuseTex = NULL;
+		// TODO texture size
+	};
+
 	struct Primitive {
 		PrimitiveType primitiveType = Triangle;	// C++ 11 init
 		VertexOut v[3];
 	};
 	struct Fragment {
 		glm::vec3 color;
+
+		//!!! test, delete later for assignments
+
+		// eyePos, eyeNor ...
+		// ambient, specular ...
+		VertexAttributeTexcoord texcoord0;
+
+		TextureData* dev_diffuseTex;
 	};
 
 	struct PrimitiveDevBufPointers {
@@ -66,6 +78,9 @@ namespace {
 		VertexAttributePosition* dev_position;
 		VertexAttributeNormal* dev_normal;
 		VertexAttributeTexcoord* dev_texcoord0;
+
+		// Materials
+		TextureData* dev_diffuseTex;
 
 		// Vertex Out, changing for each frame
 		VertexOut* dev_verticesOut;
@@ -83,7 +98,7 @@ static int height = 0;
 
 static int totalNumPrimitives = 0;
 static Primitive *dev_primitives = NULL;
-static Fragment *dev_depthbuffer = NULL;
+static Fragment *dev_fragmentBuffer = NULL;
 static glm::vec3 *dev_framebuffer = NULL;
 
 
@@ -111,13 +126,31 @@ void sendImageToPBO(uchar4 *pbo, int w, int h, glm::vec3 *image) {
 
 // Writes fragment colors to the framebuffer
 __global__
-void render(int w, int h, Fragment *depthbuffer, glm::vec3 *framebuffer) {
+void render(int w, int h, Fragment *fragmentBuffer, glm::vec3 *framebuffer) {
     int x = (blockIdx.x * blockDim.x) + threadIdx.x;
     int y = (blockIdx.y * blockDim.y) + threadIdx.y;
     int index = x + (y * w);
 
     if (x < w && y < h) {
-        framebuffer[index] = depthbuffer[index].color;
+        //framebuffer[index] = fragmentBuffer[index].color;
+
+
+		//!!!! TODO: delete for assignemnts
+		const Fragment & f = fragmentBuffer[index];
+
+		if (f.dev_diffuseTex != NULL) {
+			int rid = 3 * ((int)(512.0f*f.texcoord0.x) + (int)(512.0f*f.texcoord0.y) * 512);
+
+			framebuffer[index].r = (float)((unsigned int)f.dev_diffuseTex[rid]) / 255.0f;
+			framebuffer[index].g = (float)((unsigned int)f.dev_diffuseTex[rid + 1]) / 255.0f;
+			framebuffer[index].b = (float)((unsigned int)f.dev_diffuseTex[rid + 2]) / 255.0f;
+		}
+		else {
+			framebuffer[index] = fragmentBuffer[index].color;
+		}
+		
+
+		
     }
 }
 
@@ -153,9 +186,9 @@ void initDepth(int w, int h, int * depth)
 void rasterizeInit(int w, int h) {
     width = w;
     height = h;
-    cudaFree(dev_depthbuffer);
-    cudaMalloc(&dev_depthbuffer,   width * height * sizeof(Fragment));
-    cudaMemset(dev_depthbuffer, 0, width * height * sizeof(Fragment));
+	cudaFree(dev_fragmentBuffer);
+	cudaMalloc(&dev_fragmentBuffer, width * height * sizeof(Fragment));
+	cudaMemset(dev_fragmentBuffer, 0, width * height * sizeof(Fragment));
     cudaFree(dev_framebuffer);
     cudaMalloc(&dev_framebuffer,   width * height * sizeof(glm::vec3));
     cudaMemset(dev_framebuffer, 0, width * height * sizeof(glm::vec3));
@@ -403,7 +436,27 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 				checkCUDAError("Malloc VertexOut Buffer");
 
 				// ----------Materials-------------
-				// TODO
+				TextureData* dev_diffuseTex = NULL;
+				if (primitive.material.empty()) {
+					continue;
+				}
+				const tinygltf::Material &mat = scene.materials.at(primitive.material);
+				printf("material.name = %s\n", mat.name.c_str());
+				if (mat.values.find("diffuse") != mat.values.end()) {
+					std::string diffuseTexName = mat.values.at("diffuse").string_value;
+					if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
+						const tinygltf::Texture &tex = scene.textures.at(diffuseTexName);
+						if (scene.images.find(tex.source) != scene.images.end()) {
+							const tinygltf::Image &image = scene.images.at(tex.source);
+
+							size_t s = image.image.size() * sizeof(TextureData);
+							cudaMalloc(&dev_diffuseTex, s);
+							cudaMemcpy(dev_diffuseTex, &image.image.at(0), s, cudaMemcpyHostToDevice);
+
+							checkCUDAError("Set Texture Image data");
+						}
+					}
+				}
 
 
 				// at the end of the for loop of primitive
@@ -419,6 +472,8 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 					dev_position,
 					dev_normal,
 					dev_texcoord0,
+
+					dev_diffuseTex,
 
 					dev_vertexOut	//VertexOut
 				});
@@ -465,7 +520,11 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 * ?? can combine with pritimitiveAssembly to make only one kernel call??
 */
 __global__ 
-void _vertexTransformAndAssembly(int numVertices, PrimitiveDevBufPointers primitive, glm::mat4 MVP, glm::mat4 MV, glm::mat3 MV_normal, int width, int height) {
+void _vertexTransformAndAssembly(
+	int numVertices, 
+	PrimitiveDevBufPointers primitive, 
+	glm::mat4 MVP, glm::mat4 MV, glm::mat3 MV_normal, 
+	int width, int height) {
 	// TODO: delete for assignments
 
 	// vertex id
@@ -485,6 +544,9 @@ void _vertexTransformAndAssembly(int numVertices, PrimitiveDevBufPointers primit
 		primitive.dev_verticesOut[vid].eyePos = glm::vec3(temp) / temp.w * pos.w;
 		primitive.dev_verticesOut[vid].eyeNor = MV_normal * primitive.dev_normal[vid] * pos.w;
 		primitive.dev_verticesOut[vid].texcoord0 = primitive.dev_texcoord0[vid] * pos.w;
+
+		// texture
+		primitive.dev_verticesOut[vid].dev_diffuseTex = primitive.dev_diffuseTex;
 	}
 }
 
@@ -654,6 +716,9 @@ void drawOneScanLine(int width, const Edge & e1, const Edge & e2, int y,
 			//fragments[idx].color = glm::vec3(p.pos.z);
 
 			fragments[idx].color = p.eyeNor / p.pos.w;
+
+			fragments[idx].texcoord0 = p.texcoord0 / p.pos.w;
+			fragments[idx].dev_diffuseTex = tri.v[0].dev_diffuseTex;
 			//fragments[idx].color = glm::vec3(p.texcoord0 / p.pos.w, 0.0f);
 
 			//fragments[idx].color = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -674,7 +739,7 @@ void drawOneScanLine(int width, const Edge & e1, const Edge & e2, int y,
 * e1 - longest y span
 */
 __device__
-void drawAllScanLines(int width, int height, Edge  e1, Edge  e2, 
+void drawAllScanLines(int width, int height, Edge e1, Edge e2, 
 	Fragment * fragments, int * depth, const Primitive &  tri)
 {
 	// Discard horizontal edge as there is nothing to rasterize
@@ -871,21 +936,23 @@ void rasterize(uchar4 *pbo, const glm::mat4 & MVP, const glm::mat4 & MV, const g
 	}
 	
 	// !!!!!!!!!!!!!!!!Rasterize: temp test
-	cudaMemset(dev_depthbuffer, 0, width * height * sizeof(Fragment));
+	cudaMemset(dev_fragmentBuffer, 0, width * height * sizeof(Fragment));
 	initDepth << <blockCount2d, blockSize2d >> >(width, height, dev_depth);
 	{
 		dim3 numThreadsPerBlock(64);
 		dim3 numBlocks((totalNumPrimitives + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
-		kernScanLineForOneTriangle << <numBlocks, numThreadsPerBlock >> >(totalNumPrimitives, width, height, dev_primitives, dev_depthbuffer, dev_depth);
+		kernScanLineForOneTriangle << <numBlocks, numThreadsPerBlock >> >(totalNumPrimitives, width, height, dev_primitives, dev_fragmentBuffer, dev_depth);
 	}
 
-
+	cudaDeviceSynchronize();
+	checkCUDAError("rasterize");
 
     // Copy depthbuffer colors into framebuffer
-    render<<<blockCount2d, blockSize2d>>>(width, height, dev_depthbuffer, dev_framebuffer);
+	render << <blockCount2d, blockSize2d >> >(width, height, dev_fragmentBuffer, dev_framebuffer);
+	checkCUDAError("fragment shader");
     // Copy framebuffer into OpenGL buffer for OpenGL previewing
     sendImageToPBO<<<blockCount2d, blockSize2d>>>(pbo, width, height, dev_framebuffer);
-    checkCUDAError("rasterize");
+    checkCUDAError("copy render result to pbo");
 }
 
 /**
@@ -903,7 +970,11 @@ void rasterizeFree() {
 			cudaFree(p->dev_position);
 			cudaFree(p->dev_normal);
 			cudaFree(p->dev_texcoord0);
+			cudaFree(p->dev_diffuseTex);
+
 			cudaFree(p->dev_verticesOut);
+
+			
 			//TODO: release other attributes and materials
 		}
 	}
@@ -913,8 +984,8 @@ void rasterizeFree() {
     cudaFree(dev_primitives);
     dev_primitives = NULL;
 
-    cudaFree(dev_depthbuffer);
-    dev_depthbuffer = NULL;
+	cudaFree(dev_fragmentBuffer);
+	dev_fragmentBuffer = NULL;
 
     cudaFree(dev_framebuffer);
     dev_framebuffer = NULL;
