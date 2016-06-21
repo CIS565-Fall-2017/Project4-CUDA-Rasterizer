@@ -6,8 +6,6 @@
  * @copyright University of Pennsylvania & STUDENT
  */
 
-
-
 #include <cmath>
 #include <cstdio>
 #include <cuda.h>
@@ -18,6 +16,8 @@
 
 #include "rasterize.h"
 
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <util/tiny_gltf_loader.h>
 
@@ -138,16 +138,16 @@ void render(int w, int h, Fragment *fragmentBuffer, glm::vec3 *framebuffer) {
 		//!!!! TODO: delete for assignemnts
 		const Fragment & f = fragmentBuffer[index];
 
-		if (f.dev_diffuseTex != NULL) {
-			int rid = 3 * ((int)(512.0f*f.texcoord0.x) + (int)(512.0f*f.texcoord0.y) * 512);
+		//if (f.dev_diffuseTex != NULL) {
+		//	int rid = 3 * ((int)(512.0f*f.texcoord0.x) + (int)(512.0f*f.texcoord0.y) * 512);
 
-			framebuffer[index].r = (float)((unsigned int)f.dev_diffuseTex[rid]) / 255.0f;
-			framebuffer[index].g = (float)((unsigned int)f.dev_diffuseTex[rid + 1]) / 255.0f;
-			framebuffer[index].b = (float)((unsigned int)f.dev_diffuseTex[rid + 2]) / 255.0f;
-		}
-		else {
+		//	framebuffer[index].r = (float)((unsigned int)f.dev_diffuseTex[rid]) / 255.0f;
+		//	framebuffer[index].g = (float)((unsigned int)f.dev_diffuseTex[rid + 1]) / 255.0f;
+		//	framebuffer[index].b = (float)((unsigned int)f.dev_diffuseTex[rid + 2]) / 255.0f;
+		//}
+		//else {
 			framebuffer[index] = fragmentBuffer[index].color;
-		}
+		//}
 		
 
 		
@@ -240,6 +240,85 @@ void _deviceBufferCopy(int N, BufferByte* dev_dst, const BufferByte* dev_src, in
 }
 
 
+__global__
+void _nodeMatrixTransform(
+	int numVertices,
+	VertexAttributePosition* position,
+	VertexAttributeNormal* normal,
+	glm::mat4 MV, glm::mat3 MV_normal) {
+
+	// vertex id
+	int vid = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (vid < numVertices) {
+		position[vid] = glm::vec3(MV * glm::vec4(position[vid], 1.0f));
+		normal[vid] = glm::normalize(MV_normal * normal[vid]);
+	}
+}
+
+
+
+
+glm::mat4 getMatrixFromNodeMatrixVector(const tinygltf::Node & n) {
+	
+	glm::mat4 curMatrix(1.0);
+
+	const std::vector<double> &m = n.matrix;
+	if (m.size() > 0) {
+		for (int i = 0; i < 4; i++) {
+			for (int j = 0; j < 4; j++) {
+				curMatrix[i][j] = (float)m.at(4 * i + j);
+			}
+		}
+	}
+	else {
+		// TRS
+
+		if (n.translation.size() > 0) {
+			curMatrix[3][0] = n.translation[0];
+			curMatrix[3][1] = n.translation[1];
+			curMatrix[3][2] = n.translation[2];
+		}
+
+		if (n.rotation.size() > 0) {
+			glm::mat4 R;
+			glm::quat q;
+			q[0] = n.rotation[0];
+			q[1] = n.rotation[1];
+			q[2] = n.rotation[2];
+
+			R = glm::mat4_cast(q);
+			curMatrix = curMatrix * R;
+		}
+
+		if (n.scale.size() > 0) {
+			curMatrix = curMatrix * glm::scale(glm::vec3(n.scale[0], n.scale[1], n.scale[2]));
+		}
+	}
+	// TODO: no matrix, use rotation, scale, translation
+
+	return curMatrix;
+}
+
+void traverseNode (
+	std::map<std::string, glm::mat4> & n2m,
+	const tinygltf::Scene & scene,
+	const std::string & nodeString,
+	const glm::mat4 & parentMatrix
+	) 
+{
+	const tinygltf::Node & n = scene.nodes.at(nodeString);
+	glm::mat4 M = parentMatrix * getMatrixFromNodeMatrixVector(n);
+	n2m.insert(std::pair<std::string, glm::mat4>(nodeString, M));
+
+	auto it = n.children.begin();
+	auto itEnd = n.children.end();
+
+	for (; it != itEnd; ++it) {
+		traverseNode(n2m, scene, *it, M);
+	}
+}
+
+
 void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 	totalNumPrimitives = 0;
@@ -279,210 +358,273 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 	// 2. for each meshes: for each primitive: build device buffer of indices, materail, and each attributes
 	{
-		std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
-		std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
+		//std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
+		//std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
 
-		// for each mesh
-		for (; it != itEnd; it++) {
-			const tinygltf::Mesh & mesh = it->second;
-
-			//std::pair<std::map<std::string, std::vector<PrimitiveDevBufPointers>>::iterator, bool> res = mesh2PrimitivesMap.insert(std::pair<std::string, std::vector<PrimitiveDevBufPointers>>(mesh.name, std::vector<PrimitiveDevBufPointers>()));
-			auto res = mesh2PrimitivesMap.insert(std::pair<std::string, std::vector<PrimitiveDevBufPointers>>(mesh.name, std::vector<PrimitiveDevBufPointers>()));
-			std::vector<PrimitiveDevBufPointers> & primitiveVector = (res.first)->second;
-
-			// for each primitive
-			for (size_t i = 0; i < mesh.primitives.size(); i++) {
-				const tinygltf::Primitive &primitive = mesh.primitives[i];
-
-				if (primitive.indices.empty())
-					return;
-
-				// TODO: ? now position, normal, etc data type is predefined
-				VertexIndex* dev_indices;
-				VertexAttributePosition* dev_position;
-				VertexAttributeNormal* dev_normal;
-				VertexAttributeTexcoord* dev_texcoord0;
-
-				// ----------Indices-------------
-
-				const tinygltf::Accessor &indexAccessor = scene.accessors.at(primitive.indices);
-				const tinygltf::BufferView &bufferView = scene.bufferViews.at(indexAccessor.bufferView);
-				BufferByte* dev_bufferView = bufferViewDevPointers.at(indexAccessor.bufferView);
-
-				// !! assume type is SCALAR
-				int n = 1;
-				int numIndices = indexAccessor.count;
-				int componentTypeByteSize = sizeof(VertexIndex);
-				int byteLength = numIndices * n * componentTypeByteSize;
-
-				dim3 numThreadsPerBlock(128);
-				dim3 numBlocks((numIndices + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
-				cudaMalloc(&dev_indices, byteLength);
-				_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
-					numIndices,
-					(BufferByte*)dev_indices,
-					dev_bufferView,
-					indexAccessor.byteStride,
-					indexAccessor.byteOffset,
-					componentTypeByteSize);
+		//// for each mesh
+		// for (; it != itEnd; it++) {
 
 
-				checkCUDAError("Set Index Buffer");
+
+		// first traverse Node to get local Transformation Matrix prepared
+		
 
 
-				// ---------Primitive Info-------
+		std::map<std::string, glm::mat4> nodeString2Matrix;
+		auto rootNodeNamesList = scene.scenes.at(scene.defaultScene);
 
 
-				// !! LINE_STRIP is not supported in tinygltfloader
-				int numPrimitives;
-				PrimitiveType primitiveType;
-				switch (primitive.mode) {
-				case TINYGLTF_MODE_TRIANGLES:
-					primitiveType = PrimitiveType::Triangle;
-					numPrimitives = numIndices / 3;
-					break;
-				case TINYGLTF_MODE_TRIANGLE_STRIP:
-					primitiveType = PrimitiveType::Triangle;
-					numPrimitives = numIndices - 2;
-					break;
-				case TINYGLTF_MODE_TRIANGLE_FAN:
-					primitiveType = PrimitiveType::Triangle;
-					numPrimitives = numIndices - 2;
-					break;
-				case TINYGLTF_MODE_LINE:
-					primitiveType = PrimitiveType::Line;
-					numPrimitives = numIndices / 2;
-					break;
-				case TINYGLTF_MODE_LINE_LOOP:
-					primitiveType = PrimitiveType::Line;
-					numPrimitives = numIndices + 1;
-					break;
-				case TINYGLTF_MODE_POINTS:
-					primitiveType = PrimitiveType::Point;
-					numPrimitives = numIndices;
-					break;
-				default:
-					// TODO: error
-					break;
-				};
+		{
+			auto it = rootNodeNamesList.begin();
+			auto itEnd = rootNodeNamesList.end();
+			for (; it != itEnd; ++it) {
+				traverseNode(nodeString2Matrix, scene, *it, glm::mat4(1.0f));
+			}
+		}
 
 
-				// ----------Attributes-------------
+		// parse through node to access mesh
 
-				//std::map<std::string, std::string>::const_iterator it(primitive.attributes.begin());
-				auto it(primitive.attributes.begin());
-				//std::map<std::string, std::string>::const_iterator itEnd(primitive.attributes.end());
-				auto itEnd(primitive.attributes.end());
 
-				int numVertices = 0;
-				// for each attribute
-				for (; it != itEnd; it++) {
-					const tinygltf::Accessor &accessor = scene.accessors.at(it->second);
-					const tinygltf::BufferView &bufferView = scene.bufferViews.at(accessor.bufferView);
+		//auto itNode = rootNodeNamesList.begin();
+		//auto itEndNode = rootNodeNamesList.end();
+		//for (; itNode != itEndNode; ++itNode) {
 
+		auto itNode = nodeString2Matrix.begin();
+		auto itEndNode = nodeString2Matrix.end();
+		for (; itNode != itEndNode; ++itNode) {
+
+			//const tinygltf::Node & N = scene.nodes.at(*itNode);
+			//const glm::mat4 & matrix = nodeString2Matrix.at(*itNode);
+			//const glm::mat3 & matrixNormal = glm::transpose(glm::inverse(glm::mat3(matrix)));
+
+			const tinygltf::Node & N = scene.nodes.at(itNode->first);
+			const glm::mat4 & matrix = itNode->second;
+			const glm::mat3 & matrixNormal = glm::transpose(glm::inverse(glm::mat3(matrix)));
+
+			auto itMeshName = N.meshes.begin();
+			auto itEndMeshName = N.meshes.end();
+
+			//for (; it != itEnd; it++) {
+			for (; itMeshName != itEndMeshName; ++itMeshName) {
+
+				const tinygltf::Mesh & mesh = scene.meshes.at(*itMeshName);
+
+				//std::pair<std::map<std::string, std::vector<PrimitiveDevBufPointers>>::iterator, bool> res = mesh2PrimitivesMap.insert(std::pair<std::string, std::vector<PrimitiveDevBufPointers>>(mesh.name, std::vector<PrimitiveDevBufPointers>()));
+				auto res = mesh2PrimitivesMap.insert(std::pair<std::string, std::vector<PrimitiveDevBufPointers>>(mesh.name, std::vector<PrimitiveDevBufPointers>()));
+				std::vector<PrimitiveDevBufPointers> & primitiveVector = (res.first)->second;
+
+				// for each primitive
+				for (size_t i = 0; i < mesh.primitives.size(); i++) {
+					const tinygltf::Primitive &primitive = mesh.primitives[i];
+
+					if (primitive.indices.empty())
+						return;
+
+					// TODO: ? now position, normal, etc data type is predefined
+					VertexIndex* dev_indices;
+					VertexAttributePosition* dev_position;
+					VertexAttributeNormal* dev_normal;
+					VertexAttributeTexcoord* dev_texcoord0;
+
+					// ----------Indices-------------
+
+					const tinygltf::Accessor &indexAccessor = scene.accessors.at(primitive.indices);
+					const tinygltf::BufferView &bufferView = scene.bufferViews.at(indexAccessor.bufferView);
+					BufferByte* dev_bufferView = bufferViewDevPointers.at(indexAccessor.bufferView);
+
+					// !! assume type is SCALAR
 					int n = 1;
-					if (accessor.type == TINYGLTF_TYPE_SCALAR) {
-						n = 1;
-					}
-					else if (accessor.type == TINYGLTF_TYPE_VEC2) {
-						n = 2;
-					}
-					else if (accessor.type == TINYGLTF_TYPE_VEC3) {
-						n = 3;
-					}
-					else if (accessor.type == TINYGLTF_TYPE_VEC4) {
-						n = 4;
-					}
-
-					BufferByte * dev_bufferView = bufferViewDevPointers.at(accessor.bufferView);
-					BufferByte ** dev_attribute = NULL;
-					
-					numVertices = accessor.count;
-					int componentTypeByteSize;
-
-					if (it->first.compare("POSITION") == 0) {
-						componentTypeByteSize = sizeof(VertexAttributePosition);
-						dev_attribute = (BufferByte**)&dev_position;
-					} 
-					else if (it->first.compare("NORMAL") == 0) {
-						componentTypeByteSize = sizeof(VertexAttributeNormal);
-						dev_attribute = (BufferByte**)&dev_normal;
-					}
-					else if (it->first.compare("TEXCOORD_0") == 0) {
-						componentTypeByteSize = sizeof(VertexAttributeTexcoord);
-						dev_attribute = (BufferByte**)&dev_texcoord0;
-					}
-
+					int numIndices = indexAccessor.count;
+					int componentTypeByteSize = sizeof(VertexIndex);
+					int byteLength = numIndices * n * componentTypeByteSize;
 
 					dim3 numThreadsPerBlock(128);
-					dim3 numBlocks((numVertices + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
-					int byteLength = numVertices * n * componentTypeByteSize;
-					cudaMalloc(dev_attribute, byteLength);
+					dim3 numBlocks((numIndices + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
+					cudaMalloc(&dev_indices, byteLength);
 					_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
-						numVertices,
-						*dev_attribute,
+						numIndices,
+						(BufferByte*)dev_indices,
 						dev_bufferView,
-						accessor.byteStride,
-						accessor.byteOffset,
+						indexAccessor.byteStride,
+						indexAccessor.byteOffset,
 						componentTypeByteSize);
 
-					std::string msg = "Set Attribute Buffer: " + it->first;
-					checkCUDAError(msg.c_str());
-				}
 
-				// malloc for VertexOut
-				VertexOut* dev_vertexOut;
-				cudaMalloc(&dev_vertexOut, numVertices * sizeof(VertexOut));
-				checkCUDAError("Malloc VertexOut Buffer");
+					checkCUDAError("Set Index Buffer");
 
-				// ----------Materials-------------
-				TextureData* dev_diffuseTex = NULL;
-				if (primitive.material.empty()) {
-					continue;
-				}
-				const tinygltf::Material &mat = scene.materials.at(primitive.material);
-				printf("material.name = %s\n", mat.name.c_str());
-				if (mat.values.find("diffuse") != mat.values.end()) {
-					std::string diffuseTexName = mat.values.at("diffuse").string_value;
-					if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
-						const tinygltf::Texture &tex = scene.textures.at(diffuseTexName);
-						if (scene.images.find(tex.source) != scene.images.end()) {
-							const tinygltf::Image &image = scene.images.at(tex.source);
 
-							size_t s = image.image.size() * sizeof(TextureData);
-							cudaMalloc(&dev_diffuseTex, s);
-							cudaMemcpy(dev_diffuseTex, &image.image.at(0), s, cudaMemcpyHostToDevice);
+					// ---------Primitive Info-------
 
-							checkCUDAError("Set Texture Image data");
+
+					// !! LINE_STRIP is not supported in tinygltfloader
+					int numPrimitives;
+					PrimitiveType primitiveType;
+					switch (primitive.mode) {
+					case TINYGLTF_MODE_TRIANGLES:
+						primitiveType = PrimitiveType::Triangle;
+						numPrimitives = numIndices / 3;
+						break;
+					case TINYGLTF_MODE_TRIANGLE_STRIP:
+						primitiveType = PrimitiveType::Triangle;
+						numPrimitives = numIndices - 2;
+						break;
+					case TINYGLTF_MODE_TRIANGLE_FAN:
+						primitiveType = PrimitiveType::Triangle;
+						numPrimitives = numIndices - 2;
+						break;
+					case TINYGLTF_MODE_LINE:
+						primitiveType = PrimitiveType::Line;
+						numPrimitives = numIndices / 2;
+						break;
+					case TINYGLTF_MODE_LINE_LOOP:
+						primitiveType = PrimitiveType::Line;
+						numPrimitives = numIndices + 1;
+						break;
+					case TINYGLTF_MODE_POINTS:
+						primitiveType = PrimitiveType::Point;
+						numPrimitives = numIndices;
+						break;
+					default:
+						// TODO: error
+						break;
+					};
+
+
+					// ----------Attributes-------------
+
+					//std::map<std::string, std::string>::const_iterator it(primitive.attributes.begin());
+					auto it(primitive.attributes.begin());
+					//std::map<std::string, std::string>::const_iterator itEnd(primitive.attributes.end());
+					auto itEnd(primitive.attributes.end());
+
+					int numVertices = 0;
+					// for each attribute
+					for (; it != itEnd; it++) {
+						const tinygltf::Accessor &accessor = scene.accessors.at(it->second);
+						const tinygltf::BufferView &bufferView = scene.bufferViews.at(accessor.bufferView);
+
+						int n = 1;
+						if (accessor.type == TINYGLTF_TYPE_SCALAR) {
+							n = 1;
 						}
+						else if (accessor.type == TINYGLTF_TYPE_VEC2) {
+							n = 2;
+						}
+						else if (accessor.type == TINYGLTF_TYPE_VEC3) {
+							n = 3;
+						}
+						else if (accessor.type == TINYGLTF_TYPE_VEC4) {
+							n = 4;
+						}
+
+						BufferByte * dev_bufferView = bufferViewDevPointers.at(accessor.bufferView);
+						BufferByte ** dev_attribute = NULL;
+
+						numVertices = accessor.count;
+						int componentTypeByteSize;
+
+						if (it->first.compare("POSITION") == 0) {
+							componentTypeByteSize = sizeof(VertexAttributePosition);
+							dev_attribute = (BufferByte**)&dev_position;
+						}
+						else if (it->first.compare("NORMAL") == 0) {
+							componentTypeByteSize = sizeof(VertexAttributeNormal);
+							dev_attribute = (BufferByte**)&dev_normal;
+						}
+						else if (it->first.compare("TEXCOORD_0") == 0) {
+							componentTypeByteSize = sizeof(VertexAttributeTexcoord);
+							dev_attribute = (BufferByte**)&dev_texcoord0;
+						}
+
+
+						dim3 numThreadsPerBlock(128);
+						dim3 numBlocks((n * numVertices + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
+						int byteLength = numVertices * n * componentTypeByteSize;
+						cudaMalloc(dev_attribute, byteLength);
+						_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
+							n * numVertices,
+							*dev_attribute,
+							dev_bufferView,
+							accessor.byteStride,
+							accessor.byteOffset,
+							componentTypeByteSize);
+
+						std::string msg = "Set Attribute Buffer: " + it->first;
+						checkCUDAError(msg.c_str());
 					}
-				}
+
+					// malloc for VertexOut
+					VertexOut* dev_vertexOut;
+					cudaMalloc(&dev_vertexOut, numVertices * sizeof(VertexOut));
+					checkCUDAError("Malloc VertexOut Buffer");
+
+					// ----------Materials-------------
+					TextureData* dev_diffuseTex = NULL;
+					//if (primitive.material.empty()) {
+					//	continue;
+					//}
+					//const tinygltf::Material &mat = scene.materials.at(primitive.material);
+					//printf("material.name = %s\n", mat.name.c_str());
+					//if (mat.values.find("diffuse") != mat.values.end()) {
+					//	std::string diffuseTexName = mat.values.at("diffuse").string_value;
+					//	if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
+					//		const tinygltf::Texture &tex = scene.textures.at(diffuseTexName);
+					//		if (scene.images.find(tex.source) != scene.images.end()) {
+					//			const tinygltf::Image &image = scene.images.at(tex.source);
+
+					//			size_t s = image.image.size() * sizeof(TextureData);
+					//			cudaMalloc(&dev_diffuseTex, s);
+					//			cudaMemcpy(dev_diffuseTex, &image.image.at(0), s, cudaMemcpyHostToDevice);
+
+					//			checkCUDAError("Set Texture Image data");
+					//		}
+					//	}
+					//}
 
 
-				// at the end of the for loop of primitive
-				// push dev pointers to map
-				primitiveVector.push_back(PrimitiveDevBufPointers{
-					primitive.mode,
-					primitiveType,
-					numPrimitives,
-					numIndices,
-					numVertices,
+					// ---------Node hierarchy transform--------
+					cudaDeviceSynchronize();
+					//dim3 numThreadsPerBlock(128);
+					//std::cout << numVertices << '\n';
+					dim3 numBlocksNodeTransform((numVertices + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
+					_nodeMatrixTransform << <numBlocksNodeTransform, numThreadsPerBlock >> > (
+						numVertices,
+						dev_position,
+						dev_normal,
+						matrix,
+						matrixNormal);
 
-					dev_indices,
-					dev_position,
-					dev_normal,
-					dev_texcoord0,
+					checkCUDAError("Node hierarchy transformation");
 
-					dev_diffuseTex,
 
-					dev_vertexOut	//VertexOut
-				});
 
-				totalNumPrimitives += numPrimitives;
+					// at the end of the for loop of primitive
+					// push dev pointers to map
+					primitiveVector.push_back(PrimitiveDevBufPointers{
+						primitive.mode,
+						primitiveType,
+						numPrimitives,
+						numIndices,
+						numVertices,
 
-			} // for each primitive
+						dev_indices,
+						dev_position,
+						dev_normal,
+						dev_texcoord0,
 
-		} // for each mesh
+						dev_diffuseTex,
+
+						dev_vertexOut	//VertexOut
+					});
+
+					totalNumPrimitives += numPrimitives;
+
+				} // for each primitive
+
+			} // for each mesh
+
+		} // for each node
 
 	}
 	
