@@ -537,10 +537,11 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 							dev_attribute = (BufferByte**)&dev_texcoord0;
 						}
 
+						std::cout << accessor.bufferView << "  -  " << it->second << "  -  " << it->first << '\n';
 
 						dim3 numThreadsPerBlock(128);
 						dim3 numBlocks((n * numVertices + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
-						int byteLength = numVertices * n * componentTypeByteSize;
+						int byteLength = numVertices * componentTypeByteSize;
 						cudaMalloc(dev_attribute, byteLength);
 						_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
 							n * numVertices,
