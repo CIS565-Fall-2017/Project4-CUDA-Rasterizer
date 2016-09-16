@@ -226,13 +226,36 @@ void rasterizeInit(int w, int h) {
 * kern function with support for stride to sometimes replace cudaMemcpy
 */
 __global__ 
-void _deviceBufferCopy(int N, BufferByte* dev_dst, const BufferByte* dev_src, int byteStride, int byteOffset, int componentTypeByteSize) {
+void _deviceBufferCopy(int N, BufferByte* dev_dst, const BufferByte* dev_src, int n, int byteStride, int byteOffset, int componentTypeByteSize) {
 	
+	// Attribute (vec3 position)
+	// component (3 * float)
+	// byte (4 * byte)
+
+	// id of component
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
+	if (byteOffset == 1197504) {
+		i = (blockIdx.x * blockDim.x) + threadIdx.x;
+	}
+
 	if (i < N) {
+		int count = i / n;
+		int offset = i - count * n;	// which component of the attribute
+
 		for (int j = 0; j < componentTypeByteSize; j++) {
-			dev_dst[i * componentTypeByteSize + j] = dev_src[byteOffset + i * (byteStride == 0 ? componentTypeByteSize : byteStride) + j];
+			//dev_dst[i * componentTypeByteSize + j] = dev_src[byteOffset + i * (byteStride == 0 ? componentTypeByteSize : byteStride) + j];
+			
+			dev_dst[count * componentTypeByteSize * n 
+				+ offset * componentTypeByteSize 
+				+ j]
+
+				= 
+
+			dev_src[byteOffset 
+				+ count * (byteStride == 0 ? componentTypeByteSize * n : byteStride) 
+				+ offset * componentTypeByteSize 
+				+ j];
 		}
 	}
 	
@@ -446,6 +469,7 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 						numIndices,
 						(BufferByte*)dev_indices,
 						dev_bufferView,
+						n,
 						indexAccessor.byteStride,
 						indexAccessor.byteOffset,
 						componentTypeByteSize);
@@ -524,16 +548,19 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 						numVertices = accessor.count;
 						int componentTypeByteSize;
 
+						// Note: since the type of our attribute array (dev_position) is static (float32)
+						// We assume the glTF model attribute type are 5126(FLOAT) here
+
 						if (it->first.compare("POSITION") == 0) {
-							componentTypeByteSize = sizeof(VertexAttributePosition);
+							componentTypeByteSize = sizeof(VertexAttributePosition) / n;
 							dev_attribute = (BufferByte**)&dev_position;
 						}
 						else if (it->first.compare("NORMAL") == 0) {
-							componentTypeByteSize = sizeof(VertexAttributeNormal);
+							componentTypeByteSize = sizeof(VertexAttributeNormal) / n;
 							dev_attribute = (BufferByte**)&dev_normal;
 						}
 						else if (it->first.compare("TEXCOORD_0") == 0) {
-							componentTypeByteSize = sizeof(VertexAttributeTexcoord);
+							componentTypeByteSize = sizeof(VertexAttributeTexcoord) / n;
 							dev_attribute = (BufferByte**)&dev_texcoord0;
 						}
 
@@ -541,12 +568,22 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 						dim3 numThreadsPerBlock(128);
 						dim3 numBlocks((n * numVertices + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
-						int byteLength = numVertices * componentTypeByteSize;
+						int byteLength = numVertices * n * componentTypeByteSize;
 						cudaMalloc(dev_attribute, byteLength);
+
+						//_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
+						//	n * numVertices,
+						//	*dev_attribute,
+						//	dev_bufferView,
+						//	accessor.byteStride,
+						//	accessor.byteOffset,
+						//	componentTypeByteSize);
+
 						_deviceBufferCopy << <numBlocks, numThreadsPerBlock >> > (
 							n * numVertices,
 							*dev_attribute,
 							dev_bufferView,
+							n,
 							accessor.byteStride,
 							accessor.byteOffset,
 							componentTypeByteSize);
