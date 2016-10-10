@@ -103,6 +103,7 @@ void mainLoop() {
 //---------RUNTIME STUFF---------
 //-------------------------------
 float scale = 1.0f;
+//float scale = 0.1f;
 float x_trans = 0.0f, y_trans = 0.0f, z_trans = -10.0f;
 float x_angle = 0.0f, y_angle = 0.0f;
 void runCuda() {
@@ -435,5 +436,6 @@ void mouseWheelCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	const double s_s = 0.01;
 
-	scale += (float)(-s_s * yoffset);
+	//scale += (float)(-s_s * yoffset);
+	z_trans += (float)(1.0 * yoffset);
 }
