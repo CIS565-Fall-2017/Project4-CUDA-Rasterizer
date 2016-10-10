@@ -235,10 +235,6 @@ void _deviceBufferCopy(int N, BufferByte* dev_dst, const BufferByte* dev_src, in
 	// id of component
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
-	if (byteOffset == 1197504) {
-		i = (blockIdx.x * blockDim.x) + threadIdx.x;
-	}
-
 	if (i < N) {
 		int count = i / n;
 		int offset = i - count * n;	// which component of the attribute
@@ -723,10 +719,14 @@ void _vertexTransformAndAssembly(
 		glm::vec4 temp = MV * glm::vec4(primitive.dev_position[vid], 1.0f);
 		primitive.dev_verticesOut[vid].eyePos = glm::vec3(temp) / temp.w * pos.w;
 		primitive.dev_verticesOut[vid].eyeNor = MV_normal * primitive.dev_normal[vid] * pos.w;
-		primitive.dev_verticesOut[vid].texcoord0 = primitive.dev_texcoord0[vid] * pos.w;
-
-		// texture
-		primitive.dev_verticesOut[vid].dev_diffuseTex = primitive.dev_diffuseTex;
+		
+		// if not null
+		if (primitive.dev_texcoord0) {
+			primitive.dev_verticesOut[vid].texcoord0 = primitive.dev_texcoord0[vid] * pos.w;
+			// texture
+			primitive.dev_verticesOut[vid].dev_diffuseTex = primitive.dev_diffuseTex;
+		}
+		
 	}
 }
 
@@ -879,8 +879,10 @@ void drawOneScanLine(int width, const Edge & e1, const Edge & e2, int y,
 		p.pos = u.x * tri.v[0].pos + u.y * tri.v[1].pos + u.z * tri.v[2].pos;
 		p.eyeNor = u.x * tri.v[0].eyeNor + u.y * tri.v[1].eyeNor + u.z * tri.v[2].eyeNor;
 		p.eyePos = u.x * tri.v[0].eyePos + u.y * tri.v[1].eyePos + u.z * tri.v[2].eyePos;
+		
 		p.texcoord0 = u.x * tri.v[0].texcoord0 + u.y * tri.v[1].texcoord0 + u.z * tri.v[2].texcoord0;
-		//p.pos.w = u.x * tri.v[0].pos.w + u.y * tri.v[1].pos.w + u.z * tri.v[2].pos.w;
+		
+		p.pos.w = u.x * tri.v[0].pos.w + u.y * tri.v[1].pos.w + u.z * tri.v[2].pos.w;
 
 		int z_int = (int)(z * INT_MAX);
 
@@ -893,13 +895,17 @@ void drawOneScanLine(int width, const Edge & e1, const Edge & e2, int y,
 			//fragments[idx].depth = z;
 			//fragments[idx].color = glm::vec3(p.pos.z);
 
-			//fragments[idx].color = glm::vec3(p.pos.z);
+			// shade with white
+			//fragments[idx].color = glm::vec3(1.0);
 
+			// shade with eyeNormal
 			fragments[idx].color = p.eyeNor / p.pos.w;
 
-			fragments[idx].texcoord0 = p.texcoord0 / p.pos.w;
-			fragments[idx].dev_diffuseTex = tri.v[0].dev_diffuseTex;
+			//// Shade with texcoord
+			//fragments[idx].texcoord0 = p.texcoord0 / p.pos.w;
+			////fragments[idx].dev_diffuseTex = tri.v[0].dev_diffuseTex;
 			//fragments[idx].color = glm::vec3(p.texcoord0 / p.pos.w, 0.0f);
+
 
 			//fragments[idx].color = glm::vec3(1.0f, 1.0f, 1.0f);
 
@@ -1003,13 +1009,14 @@ void kernScanLineForOneTriangle(int num_tri, int width, int height
 	for (int i = 0; i < 3; i++)
 	{
 
-
+		//printf("%f,%f,%f\n", tri.v[i].pos.x, tri.v[i].pos.y, tri.v[i].pos.z);
 		////////
 		if (tri.v[i].pos.x < (float)width && tri.v[i].pos.x >= 0
 			&& tri.v[i].pos.y < (float)height && tri.v[i].pos.y >= 0)
 		{
 			outside = false;
 			//printf("%d", triangleId);
+			//printf("%f,%f,%f\n", tri.v[i].pos.x, tri.v[i].pos.y, tri.v[i].pos.z);
 		}
 	}
 
