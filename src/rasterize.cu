@@ -196,7 +196,7 @@ void rasterizeInit(int w, int h) {
 
 	// TODO delete
 	cudaFree(dev_depth);
-	cudaMalloc(&dev_depth, width * height *sizeof(int));
+	cudaMalloc(&dev_depth, width * height * sizeof(int));
 }
 
 
@@ -866,12 +866,15 @@ void drawOneScanLine(int width, const Edge & e1, const Edge & e2, int y,
 
 		int idx = x + y * width;
 
+		if (idx >= 640000 - 300000 || idx < 0) { break; }
+
 		//VertexOut p = interpolateVertexOut(cur_v_e1, cur_v_e2, ((float)x-x_left_origin) / gap_x);
 
 
 		//using barycentric
 		glm::vec3 t[3] = { glm::vec3(tri.v[0].pos), glm::vec3(tri.v[1].pos), glm::vec3(tri.v[2].pos) };
 		glm::vec3 u = calculateBarycentricCoordinate(t, glm::vec2(x, y));
+		//glm::vec3 u(0.5, 0.5, 0.5);
 
 		VertexOut p;
 		//p.pos = u.x * tri.v[0].pos + u.y * tri.v[1].pos + u.z * tri.v[2].pos;
@@ -896,10 +899,10 @@ void drawOneScanLine(int width, const Edge & e1, const Edge & e2, int y,
 			//fragments[idx].color = glm::vec3(p.pos.z);
 
 			// shade with white
-			//fragments[idx].color = glm::vec3(1.0);
+			fragments[idx].color = glm::vec3(1.0);
 
 			// shade with eyeNormal
-			fragments[idx].color = p.eyeNor / p.pos.w;
+			//fragments[idx].color = p.eyeNor / p.pos.w;
 
 			//// Shade with texcoord
 			//fragments[idx].texcoord0 = p.texcoord0 / p.pos.w;
