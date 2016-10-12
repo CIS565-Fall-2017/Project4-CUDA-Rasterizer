@@ -24,13 +24,6 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    //obj *mesh = new obj();
-
-    //{
-    //    objLoader loader(argv[1], mesh);
-    //    mesh->buildBufPoss();
-    //}
-
 	tinygltf::Scene scene;
 	tinygltf::TinyGLTFLoader loader;
 	std::string err;
@@ -103,16 +96,12 @@ void mainLoop() {
 //---------RUNTIME STUFF---------
 //-------------------------------
 float scale = 1.0f;
-//float scale = 0.1f;
 float x_trans = 0.0f, y_trans = 0.0f, z_trans = -10.0f;
 float x_angle = 0.0f, y_angle = 0.0f;
 void runCuda() {
     // Map OpenGL buffer object for writing from CUDA on a single GPU
     // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
     dptr = NULL;
-
-	//temp
-	
 	
 	glm::mat4 P = glm::frustum<float>(-scale * ((float)width) / ((float)height),
 		scale * ((float)width / (float)height),
@@ -126,11 +115,8 @@ void runCuda() {
 		* glm::rotate(y_angle, glm::vec3(0.0f, 1.0f, 0.0f));
 	
 	glm::mat3 MV_normal = glm::transpose(glm::inverse(glm::mat3(V) * glm::mat3(M)));
-
-	
 	glm::mat4 MV = V * M;
 	glm::mat4 MVP = P * MV;
-
 
     cudaGLMapBufferObject((void **)&dptr, pbo);
 	rasterize(dptr, MVP, MV, MV_normal);
@@ -138,7 +124,6 @@ void runCuda() {
 
     frame++;
     fpstracker++;
-
 }
 
 //-------------------------------
@@ -174,20 +159,9 @@ bool init(const tinygltf::Scene & scene) {
     initCuda();
 	initPBO();
 
-	//float cbo[] = {
-	//    0.0, 1.0, 0.0,
-	//    0.0, 0.0, 1.0,
-	//    1.0, 0.0, 0.0
-	//};
-
-
-	// !!!!! TODO: delete me! for assignments
-
-	//MY Mouse Control
+	// Mouse Control Callbacks
 	glfwSetMouseButtonCallback(window, mouseButtonCallback);
 	glfwSetCursorPosCallback(window, mouseMotionCallback);
-
-
 	glfwSetScrollCallback(window, mouseWheelCallback);
 
 	{
@@ -195,10 +169,8 @@ bool init(const tinygltf::Scene & scene) {
 			scene.scenes.begin());
 		std::map<std::string, std::vector<std::string> >::const_iterator itEnd(
 			scene.scenes.end());
-		//std::cout << "scenes(items=" << scene.scenes.size() << ")" << std::endl;
+
 		for (; it != itEnd; it++) {
-			//std::cout << Indent(1) << "name  : " << it->first << std::endl;
-			//std::cout << Indent(2) << "nodes : [ ";
 			for (size_t i = 0; i < it->second.size(); i++) {
 				std::cout << it->second[i]
 					<< ((i != (it->second.size() - 1)) ? ", " : "");
@@ -206,11 +178,6 @@ bool init(const tinygltf::Scene & scene) {
 			std::cout << " ] " << std::endl;
 		}
 	}
-
-	
-
-
-
 
 
 	rasterizeSetBuffers(scene);
@@ -373,15 +340,9 @@ static std::string getFilePathExtension(const std::string &FileName) {
 
 
 
-
-
-
-
-
-
-
-// !!!!!  TODO: delete me !!!!!
-// mouse control
+//-----------------------------
+//---- Mouse control ----------
+//-----------------------------
 
 enum ControlState { NONE = 0, ROTATE, TRANSLATE };
 ControlState mouseState = NONE;
@@ -403,7 +364,6 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 	{
 		mouseState = NONE;
 	}
-	//printf("%d\n", mouseState);
 }
 
 double lastx = (double)width / 2;
@@ -434,8 +394,6 @@ void mouseMotionCallback(GLFWwindow* window, double xpos, double ypos)
 
 void mouseWheelCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
-	const double s_s = 0.01;
-
-	//scale += (float)(-s_s * yoffset);
-	z_trans += (float)(1.0 * yoffset);
+	const double s = 1.0;	// sensitivity
+	z_trans += (float)(s * yoffset);
 }
