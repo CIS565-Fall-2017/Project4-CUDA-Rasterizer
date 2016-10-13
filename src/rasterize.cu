@@ -625,41 +625,24 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 
 
 
-/**
-* for one primitive
-* ?? can combine with pritimitiveAssembly to make only one kernel call??
-*/
 __global__ 
 void _vertexTransformAndAssembly(
 	int numVertices, 
 	PrimitiveDevBufPointers primitive, 
 	glm::mat4 MVP, glm::mat4 MV, glm::mat3 MV_normal, 
 	int width, int height) {
-	// TODO: delete for assignments
 
 	// vertex id
 	int vid = (blockIdx.x * blockDim.x) + threadIdx.x;
 	if (vid < numVertices) {
-		primitive.dev_verticesOut[vid].pos = MVP * glm::vec4(primitive.dev_position[vid], 1.0f);
 
-		// clipping space (to NDC -1,1) to viewport
-		glm::vec4 & pos = primitive.dev_verticesOut[vid].pos;
-		pos.w = 1.0f / pos.w; // 1/w
-		pos.x = 0.5f * (float)width * (pos.x * pos.w + 1.0f);
-		pos.y = 0.5f * (float)height * (pos.y * pos.w + 1.0f);
-		pos.z = 0.5f * (pos.z * pos.w + 1.0f);
+		// TODO: Apply vertex transformation here
+		// Multiply the MVP matrix for each vertex position, this will transform everything into clipping space
+		// Then divide the pos by its w element to transform into NDC space
+		// Finally transform x and y to viewport space
 
-		//perspective correct interpolation
-		glm::vec4 temp = MV * glm::vec4(primitive.dev_position[vid], 1.0f);
-		primitive.dev_verticesOut[vid].eyePos = glm::vec3(temp) / temp.w * pos.w;
-		primitive.dev_verticesOut[vid].eyeNor = MV_normal * primitive.dev_normal[vid] * pos.w;
-		
-		// if not null
-		if (primitive.dev_texcoord0) {
-			primitive.dev_verticesOut[vid].texcoord0 = primitive.dev_texcoord0[vid] * pos.w;
-			// texture
-			primitive.dev_verticesOut[vid].dev_diffuseTex = primitive.dev_diffuseTex;
-		}
+		// TODO: Apply vertex assembly here
+		// Assemble all attribute arraies into the primitive array
 		
 	}
 }
@@ -670,348 +653,27 @@ static int curPrimitiveBeginId = 0;
 
 __global__ 
 void _primitiveAssembly(int numIndices, int curPrimitiveBeginId, Primitive* dev_primitives, PrimitiveDevBufPointers primitive) {
-	// TODO: delete for assignments
 
 	// index id
 	int iid = (blockIdx.x * blockDim.x) + threadIdx.x;
 
 	if (iid < numIndices) {
-		int pid;	//id for cur primitives vector
-		if (primitive.primitiveMode == TINYGLTF_MODE_TRIANGLES) {
-			pid = iid / (int)primitive.primitiveType;
-			dev_primitives[pid + curPrimitiveBeginId].v[iid % (int)primitive.primitiveType]
-				= primitive.dev_verticesOut[primitive.dev_indices[iid]];
-		}
+
+		// TODO: uncomment the following code for a start
+		// This is primitive assembly for triangles
+
+		//int pid;	// id for cur primitives vector
+		//if (primitive.primitiveMode == TINYGLTF_MODE_TRIANGLES) {
+		//	pid = iid / (int)primitive.primitiveType;
+		//	dev_primitives[pid + curPrimitiveBeginId].v[iid % (int)primitive.primitiveType]
+		//		= primitive.dev_verticesOut[primitive.dev_indices[iid]];
+		//}
+
+
+		// TODO: other primitive types (point, line)
 	}
 	
-	// TODO: other primitive types
 }
-
-
-
-
-
-
-
-
-
-
-
-// -----------------------------------------------------------
-// TODO: delete for assignment
-
-struct Edge
-{
-	VertexOut v[2];
-
-	float x, z;
-	float dx, dz;
-
-
-	//
-	//VertexOut cur_v;	//used for interpolate between a scan line
-	float gap_y;
-};
-//e.v[0] is the one with smaller y value
-//scan from v[0] to v[1]
-__device__
-void constructEdge(Edge & e, const VertexOut & v0, const VertexOut & v1)
-{
-	if (v0.pos.y <= v1.pos.y)
-	{
-		e.v[0] = v0;
-		e.v[1] = v1;
-	}
-	else
-	{
-		e.v[0] = v1;
-		e.v[1] = v0;
-	}
-
-	e.gap_y = 0.0f;
-
-}
-
-__device__
-float initEdge(Edge & e, float y)
-{
-	e.gap_y = e.v[1].pos.y - e.v[0].pos.y;
-
-	e.dx = (e.v[1].pos.x - e.v[0].pos.x) / e.gap_y;
-	e.dz = (e.v[1].pos.z - e.v[0].pos.z) / e.gap_y;
-	e.x = e.v[0].pos.x + (y - e.v[0].pos.y) * e.dx;
-	e.z = e.v[0].pos.z + (y - e.v[0].pos.y) * e.dz;
-
-	return (y - e.v[0].pos.y) / e.gap_y;
-}
-
-__device__
-void updateEdge(Edge & e)
-{
-	e.x += e.dx;
-	e.z += e.dz;
-}
-
-
-
-__device__
-void drawOneScanLine(int width, const Edge & e1, const Edge & e2, int y, 
-	float u1, float u2, Fragment * fragments, int * depth, const Primitive & tri)
-{
-
-	// Find the starting and ending x coordinates and
-	// clamp them to be within the visible region
-	int x_left = (int)(ceilf(e1.x) + EPSILON);
-	int x_right = (int)(ceilf(e2.x) + EPSILON);
-
-
-	float x_left_origin = e1.x;
-	float x_right_origin = e2.x;
-
-	if (x_left < 0)
-	{
-		x_left = 0;
-	}
-
-	if (x_right > width)
-	{
-		x_right = width;
-	}
-
-	// Discard scanline with no actual rasterization and also
-	// ensure that the length is larger than zero
-	if (x_left >= x_right) { return; }
-
-
-	//TODO: get two interpolated segment end points
-	//VertexOut cur_v_e1 = interpolateVertexOut(e1.v[0], e1.v[1], u1);
-	//VertexOut cur_v_e2 = interpolateVertexOut(e2.v[0], e2.v[1], u2);
-
-
-	//Initialize attributes
-	float dz = (e2.z - e1.z) / (e2.x - e1.x);
-	float z = e1.z + (x_left_origin - e1.x) * dz;
-
-	//Interpolate
-	//printf("%d,%d\n", x_left, x_right);
-	//float gap_x = x_right_origin - x_left_origin;
-	for (int x = x_left; x < x_right; ++x)
-	{
-
-		int idx = x + y * width;
-
-		//if (idx >= 640000 - 300000 || idx < 0) { break; }
-
-		//VertexOut p = interpolateVertexOut(cur_v_e1, cur_v_e2, ((float)x-x_left_origin) / gap_x);
-
-
-		//using barycentric
-		glm::vec3 t[3] = { glm::vec3(tri.v[0].pos), glm::vec3(tri.v[1].pos), glm::vec3(tri.v[2].pos) };
-		glm::vec3 u = calculateBarycentricCoordinate(t, glm::vec2(x, y));
-		//glm::vec3 u(0.5, 0.5, 0.5);
-
-		VertexOut p;
-		//p.pos = u.x * tri.v[0].pos + u.y * tri.v[1].pos + u.z * tri.v[2].pos;
-		//p.pos.w = u.x * tri.v[0].pos.w + u.y * tri.v[1].pos.w + u.z * tri.v[2].pos.w;
-		p.pos = u.x * tri.v[0].pos + u.y * tri.v[1].pos + u.z * tri.v[2].pos;
-		p.eyeNor = u.x * tri.v[0].eyeNor + u.y * tri.v[1].eyeNor + u.z * tri.v[2].eyeNor;
-		p.eyePos = u.x * tri.v[0].eyePos + u.y * tri.v[1].eyePos + u.z * tri.v[2].eyePos;
-		
-		p.texcoord0 = u.x * tri.v[0].texcoord0 + u.y * tri.v[1].texcoord0 + u.z * tri.v[2].texcoord0;
-		
-		p.pos.w = u.x * tri.v[0].pos.w + u.y * tri.v[1].pos.w + u.z * tri.v[2].pos.w;
-
-		int z_int = (int)(z * INT_MAX);
-
-		int* address = &depth[idx];
-
-		atomicMin(address, z_int);
-
-		if (*address == z_int)
-		{
-			//fragments[idx].depth = z;
-			//fragments[idx].color = glm::vec3(p.pos.z);
-
-			// shade with white
-			//fragments[idx].color = glm::vec3(1.0);
-
-			// shade with eyeNormal
-			fragments[idx].color = p.eyeNor / p.pos.w;
-
-			//// Shade with texcoord
-			//fragments[idx].texcoord0 = p.texcoord0 / p.pos.w;
-			////fragments[idx].dev_diffuseTex = tri.v[0].dev_diffuseTex;
-			//fragments[idx].color = glm::vec3(p.texcoord0 / p.pos.w, 0.0f);
-
-
-			//fragments[idx].color = glm::vec3(1.0f, 1.0f, 1.0f);
-
-			//fragments[idx].has_fragment = true;
-
-		}
-
-
-
-		z += dz;
-	}
-}
-
-
-/**
-* Rasterize the area between two edges as the left and right limit.
-* e1 - longest y span
-*/
-__device__
-void drawAllScanLines(int width, int height, Edge e1, Edge e2, 
-	Fragment * fragments, int * depth, const Primitive &  tri)
-{
-	// Discard horizontal edge as there is nothing to rasterize
-	if (e2.v[1].pos.y - e2.v[0].pos.y == 0.0f) { return; }
-
-	// Find the starting and ending y positions and
-	// clamp them to be within the visible region
-	int y_bot = (int)(ceilf(e2.v[0].pos.y) + EPSILON);
-	int y_top = (int)(ceilf(e2.v[1].pos.y) + EPSILON);
-
-
-
-	float y_bot_origin = ceilf(e2.v[0].pos.y);
-	float y_top_origin = floorf(e2.v[1].pos.y);
-
-	if (y_bot < 0)
-	{
-		y_bot = 0;
-
-	}
-
-	if (y_top > height)
-	{
-		y_top = height;
-	}
-
-
-	//Initialize edge's structure
-	float u1_base = initEdge(e1, y_bot_origin);
-	initEdge(e2, y_bot_origin);
-
-
-	//printf("%f,%f\n", e1.v[0].uv.x / e1.v[0].divide_w_clip, e1.v[0].uv.y / e1.v[0].divide_w_clip );
-
-	for (int y = y_bot; y < y_top; ++y)
-	{
-
-		float u2 = ((float)y - y_bot_origin) / e2.gap_y;
-		float u1 = u1_base + ((float)y - y_bot_origin) / e1.gap_y;
-		if (e1.x <= e2.x)
-		{
-			drawOneScanLine(width, e1, e2, y, u1, u2, fragments, depth, tri);
-		}
-		else
-		{
-			drawOneScanLine(width, e2, e1, y, u2, u1, fragments, depth, tri);
-		}
-
-		//update edge
-		updateEdge(e1);
-		updateEdge(e2);
-	}
-}
-
-/**
-* Each thread handles one triangle
-* rasterization
-*/
-__global__
-void kernScanLineForOneTriangle(int num_tri, int width, int height
-, Primitive * triangles, Fragment * depth_fragment, int * depth)
-{
-	int triangleId = blockDim.x * blockIdx.x + threadIdx.x;
-
-	if (triangleId >= num_tri)
-	{
-		return;
-	}
-
-
-	Primitive tri = triangles[triangleId];	//copy
-
-
-	
-
-
-	bool outside = true;
-
-	//currently tri.v are in clipped coordinates
-	//need to transform to viewport coordinate
-	for (int i = 0; i < 3; i++)
-	{
-
-		//printf("%f,%f,%f\n", tri.v[i].pos.x, tri.v[i].pos.y, tri.v[i].pos.z);
-		////////
-		if (tri.v[i].pos.x < (float)width && tri.v[i].pos.x >= 0
-			&& tri.v[i].pos.y < (float)height && tri.v[i].pos.y >= 0)
-		{
-			outside = false;
-			//printf("%d", triangleId);
-			//printf("%f,%f,%f\n", tri.v[i].pos.x, tri.v[i].pos.y, tri.v[i].pos.z);
-		}
-	}
-
-
-	//discard triangles that are totally out of the viewport
-	if (outside)
-	{
-		return;
-	}
-	/////
-
-
-
-
-	
-
-
-	//build edge
-	// for line scan
-	Edge edges[3];
-
-	constructEdge(edges[0], tri.v[0], tri.v[1]);
-	constructEdge(edges[1], tri.v[1], tri.v[2]);
-	constructEdge(edges[2], tri.v[2], tri.v[0]);
-
-
-	//Find the edge with longest y span
-	float maxLength = 0.0f;
-	int longEdge = -1;
-	for (int i = 0; i < 3; ++i)
-	{
-		float length = edges[i].v[1].pos.y - edges[i].v[0].pos.y;
-		if (length > maxLength)
-		{
-			maxLength = length;
-			longEdge = i;
-		}
-	}
-
-
-	// get indices for other two shorter edges
-	int shortEdge0 = (longEdge + 1) % 3;
-	int shortEdge1 = (longEdge + 2) % 3;
-
-	// Rasterize two parts separately
-	drawAllScanLines(width, height, edges[longEdge], edges[shortEdge0], depth_fragment, depth, tri);
-	drawAllScanLines(width, height, edges[longEdge], edges[shortEdge1], depth_fragment, depth, tri);
-
-
-
-}
-
-
-
-
-
-
-
 
 
 
@@ -1024,7 +686,7 @@ void rasterize(uchar4 *pbo, const glm::mat4 & MVP, const glm::mat4 & MV, const g
     dim3 blockCount2d((width  - 1) / blockSize2d.x + 1,
 		(height - 1) / blockSize2d.y + 1);
 
-	// TODO: Execute your rasterization pipeline here
+	// Execute your rasterization pipeline here
 	// (See README for rasterization pipeline outline.)
 
 	// Vertex Process & primitive assembly
@@ -1059,17 +721,12 @@ void rasterize(uchar4 *pbo, const glm::mat4 & MVP, const glm::mat4 & MV, const g
 		checkCUDAError("Vertex Processing and Primitive Assembly");
 	}
 	
-	// !!!!!!!!!!!!!!!!Rasterize: temp test
 	cudaMemset(dev_fragmentBuffer, 0, width * height * sizeof(Fragment));
 	initDepth << <blockCount2d, blockSize2d >> >(width, height, dev_depth);
-	{
-		dim3 numThreadsPerBlock(64);
-		dim3 numBlocks((totalNumPrimitives + numThreadsPerBlock.x - 1) / numThreadsPerBlock.x);
-		kernScanLineForOneTriangle << <numBlocks, numThreadsPerBlock >> >(totalNumPrimitives, width, height, dev_primitives, dev_fragmentBuffer, dev_depth);
-	}
+	
+	// TODO: rasterize
 
-	cudaDeviceSynchronize();
-	checkCUDAError("rasterize");
+
 
     // Copy depthbuffer colors into framebuffer
 	render << <blockCount2d, blockSize2d >> >(width, height, dev_fragmentBuffer, dev_framebuffer);
@@ -1113,6 +770,9 @@ void rasterizeFree() {
 
     cudaFree(dev_framebuffer);
     dev_framebuffer = NULL;
+
+	cudaFree(dev_depth);
+	dev_depth = NULL;
 
     checkCUDAError("rasterizeFree");
 }
