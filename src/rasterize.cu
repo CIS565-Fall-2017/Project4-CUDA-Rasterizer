@@ -774,5 +774,5 @@ void rasterizeFree() {
 	cudaFree(dev_depth);
 	dev_depth = NULL;
 
-    checkCUDAError("rasterizeFree");
+    checkCUDAError("rasterize Free");
 }
