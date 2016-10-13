@@ -180,13 +180,6 @@ void initDepth(int w, int h, int * depth)
 	}
 }
 
-// delete or refine this later
-// 1. for mesh, for each primitive, create device buffer for indices and attributes (accessor), and bind all attribute(acessor) state
-// 2. (kern) vertex shader (transform position)
-// 3. for each primitive, do primitive assembly ( each attribute buffer => Primitive * dev_primitives)
-
-
-
 
 /**
 * kern function with support for stride to sometimes replace cudaMemcpy
