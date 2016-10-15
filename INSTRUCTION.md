@@ -83,8 +83,12 @@ See below for more guidance.
 You are also required to implement at least 2.0 "points" worth in extra features.
 (point values are given in parentheses):
 
-* (1.0) Use shared memory at some point
-* (2.0) Tile-based pipeline.
+* (1.0) Use shared memory in a feature. A few ideas:
+   * shared memory textures
+   * shared memory for some kinds of instancing
+   * shared memory uniforms - an array of lights? an array of skinning matrices?
+   * tile-based post processing - SSAO? Bloom? Toon Shading?
+* (2.0) Tile-based pipeline
 * Additional pipeline stages.
    * (1.0) Tessellation shader.
    * (1.0) Geometry shader, able to output a variable number of primitives per
@@ -102,7 +106,12 @@ You are also required to implement at least 2.0 "points" worth in extra features
 * Support for rasterizing additional primitives:
    * (0.5) Lines or line strips.
    * (0.5) Points.
-* (1.0) Anti-aliasing.
+   * For rasterizing lines and points, you may start with a toggle mode that
+   switches your pipeline from displaying triangles to displaying a wireframe
+   or a point cloud.
+* Anti-aliasing
+   * (0.5) FSAA - full-screen antialiasing
+   * (1.0) FSAA vs MSAA - performance comparison with multi-sample antialiasing
 * (1.0) Occlusion queries.
 * (1.0) Order-independent translucency using a k-buffer.
 
