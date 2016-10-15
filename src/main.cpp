@@ -20,7 +20,7 @@
 
 int main(int argc, char **argv) {
     if (argc != 2) {
-        cout << "Usage: [obj file]" << endl;
+        cout << "Usage: [gltf file]" << endl;
         return 0;
     }
 
@@ -102,7 +102,7 @@ void runCuda() {
     // Map OpenGL buffer object for writing from CUDA on a single GPU
     // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
     dptr = NULL;
-	
+
 	glm::mat4 P = glm::frustum<float>(-scale * ((float)width) / ((float)height),
 		scale * ((float)width / (float)height),
 		-scale, scale, 1.0, 1000.0);
@@ -113,7 +113,7 @@ void runCuda() {
 		glm::translate(glm::vec3(x_trans, y_trans, z_trans))
 		* glm::rotate(x_angle, glm::vec3(1.0f, 0.0f, 0.0f))
 		* glm::rotate(y_angle, glm::vec3(0.0f, 1.0f, 0.0f));
-	
+
 	glm::mat3 MV_normal = glm::transpose(glm::inverse(glm::mat3(V) * glm::mat3(M)));
 	glm::mat4 MV = V * M;
 	glm::mat4 MVP = P * MV;

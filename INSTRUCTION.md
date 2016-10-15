@@ -3,14 +3,14 @@ Instructions - CUDA-RASTERIZER
 
 This is due **TBD: 2016, evening at midnight**.
 
-**Summary:** 
+**Summary:**
 In this project, you will use CUDA to implement a simplified
 rasterized graphics pipeline, similar to the OpenGL pipeline. You will
 implement vertex shading, primitive assembly, rasterization, fragment shading,
 and a framebuffer. More information about the rasterized graphics pipeline can
 be found in the class slides and in the CIS 560 lecture notes.
 
-The base code provided includes an glTF loader (tinygltfloader) and much of the I/O and
+The base code provided includes a glTF loader (tinygltfloader) and much of the I/O and
 bookkeeping code. It also includes some functions that you may find useful,
 described below. The core rasterization pipeline is left for you to implement.
 
@@ -34,6 +34,7 @@ bunch of them around so you can pick a few to document your progress.
   * `gltfs/duck/duck.gltf` (has a diffuse texture)
   * `gltfs/CesiumMilkTruck/CesiumMilkTruck.gltf` (has several textures)
   * `gltfs/2_cylinder_engine/2_cylinder_engine.gltf` (relatively complex model, no texture)
+  * `gltfs/flower/flower.gltf` (model with a lot of layers from most angles)
 * `renders/` Test implementation render result of duck.gltf.
 * `external/` Includes and static libraries for 3rd party libraries.
 
@@ -45,10 +46,11 @@ one as an argument: `cis565_rasterizer gltfs/duck/duck.gltf`.
 
 If you are using Visual Studio, you can set this in the Debugging > Command
 Arguments section in the Project properties. Note that this value is different
-for every different configuration type. Make sure you get the path right; read
+for every different configuration type. You can also set the argument for all
+configurations to simplify this. Make sure you get the path right; read
 the console for errors.
 
-You can also launch the built program from command line to feed the arguments. 
+You can also launch the built program from command line to feed the arguments.
 
 ## Requirements
 
@@ -56,10 +58,11 @@ You can also launch the built program from command line to feed the arguments.
 
 In this project, you are given the following code:
 
-* A tiny glTF loader for loading glTF format models and converting them to 
+* A tiny glTF loader for loading glTF format models and converting them to
 OpenGL-style buffers of index and attribute data.
-    * [glTF](https://github.com/KhronosGroup/glTF) is a standard model format (Patrick being one of the major contributors). 
-    No need to worry about its details cuz it's all done for you. 
+    * [glTF](https://github.com/KhronosGroup/glTF) is a standard model format (Patrick being one of the major contributors).
+    No need to worry about its details because it's all done for you, unless
+    you would like to support primitives besides triangles.
 * Structs for some parts of the pipeline.
 * Fragment buffer to framebuffer copy.
 * CUDA-GL interop.
@@ -111,25 +114,27 @@ For each extra feature, please provide the following brief analysis:
 
 * Concise overview write-up of the feature.
 * Performance impact of adding the feature (slower or faster).
+  * where is the performance hit?
+  * where is the performance improvement?
 * If you did something to accelerate the feature, what did you do and why?
 * How might this feature be optimized beyond your current implementation?
 
 
 ## Base Code Tour
 
-You will be working primarily in : `rasterize.cu`. 
+You will be working primarily in : `rasterize.cu`.
 Areas that you need to complete are
 marked with a `TODO` comment. Functions that are useful
-for reference are marked with the comment `CHECKITOUT`. 
+for reference are marked with the comment `CHECKITOUT`.
 
-* `src/rasterize.cu` contains the core rasterization pipeline. 
+* `src/rasterize.cu` contains the core rasterization pipeline.
   * A few pre-made structs are included for you to use, but those marked with
     TODO will also be needed for a simple rasterizer. As with any part of the
     base code, you may modify or replace these as you see fit.
-  * `PrimitiveDevBufPointers` freshly loaded attribute buffers, texture pointer, etc. from glTF models. 
+  * `PrimitiveDevBufPointers` freshly loaded attribute buffers, texture pointer, etc. from glTF models.
     Everything is either a basic data type or already copied to device memory.
-  * `VertexOut` assembled vertex with various attributes ranging from position to texcoord. 
-  * `Primitive` assembled primitive with vertices 
+  * `VertexOut` assembled vertex with various attributes ranging from position to texcoord.
+  * `Primitive` assembled primitive with vertices
   * `Fragment` final fragments passed depth/scissor/stencil test waiting to shade
 
 * `src/rasterizeTools.h` contains various useful tools
@@ -155,27 +160,28 @@ debugging.
 Start out by testing with some simple models (`box.gltf`).
 
 * Clear the fragment buffer with some default value.
-* Vertex shading: 
+* Vertex shading:
   * `VertexIn[n] vs_input -> VertexOut[n] vs_output`
-  * A minimal vertex shader will apply no transformations at all - it draws world position 
+  * A minimal vertex shader will apply no transformations at all - it draws world position
     directly in normalized device coordinates (-1 to 1 in each dimension).
 * Primitive assembly.
   * `VertexOut[n] vs_output -> Triangle[t] primitives`
-  * Code is actually provided, simply uncomment them. (cuz it might need to read through the gltf setup code to fully implement on your own)
+  * Code is actually provided, simply uncomment it. (since you might need to
+    read through the gltf setup code to fully implement this on your own)
 * Rasterization.
   * `Triangle[t] primitives -> Fragment[m] rasterized`
   * A scanline implementation is simple to start with.
-  * Parallelize over triangles, but for now, loop over every pixel in each
-    thread.
+  * Parallelize over triangles. For now, loop over every pixel in the
+    fragment buffer in each thread.
   * Note that you won't have any real allocated array of size `m`.
 * Fragments to depth buffer.
   * `Fragment[m] rasterized -> Fragment[width][height] depthbuffer`
     * `depthbuffer` is for storing and depth testing fragments.
   * Results in race conditions - don't bother to fix these until it works!
-  * Can really be done inside the fragment shader, if you call the fragment
-    shader from the rasterization kernel for every fragment (including those
-    which get occluded). **OR,** this can be done before fragment shading,
-    which may be faster but means the fragment shader cannot change the depth.
+  * Can really be done inside/after the fragment shading, if you call the fragment
+    shading from the rasterization kernel for every fragment (including those
+    which get occluded). Doing this before fragment shading may be faster (why?)
+    but means the fragment shader cannot change the depth.
 * Fragment shading.
   * `Fragment[width][height] depthbuffer ->`
   * A super-simple test fragment shader: output same color for every fragment.
@@ -185,15 +191,14 @@ Start out by testing with some simple models (`box.gltf`).
   * Simply saves the fragment shader results into the framebuffer
     (to be displayed on the screen).
 
-Where you have the following data structure:
 
 
 ### A Useful Pipeline
 
-* Clear the depth buffer with some default value.
+* Clear the fragment and depth buffers with some default values.
   * You should be able to pass a default value to the clear function, so that
     you can set the clear color (background), clear depth, etc.
-* Vertex shading: 
+* Vertex shading:
   * `VertexIn[n] vs_input -> VertexOut[n] vs_output`
   * Apply some vertex transformation (e.g. model-view-projection matrix using
     `glm::lookAt ` and `glm::perspective `).
@@ -203,8 +208,11 @@ Where you have the following data structure:
   * Other primitive types are optional.
 * Rasterization.
   * `Triangle[t] primitives -> Fragment[m] rasterized`
-  * You may choose to do a tiled rasterization method, which should have lower
-    global memory bandwidth. It will also change other parts of the pipeline.
+  * You may choose to do a shared-memory tiled rasterization method,
+    which should have lower global memory bandwidth.
+    It will also change other parts of the pipeline - only try this AFTER you
+    having a working "useful" pipeline, both for sanity and for the sake of
+    comparison.
   * Parallelize over triangles, but now avoid looping over all pixels:
     * When rasterizing a triangle, only scan over the box around the triangle
       (`getAABBForTriangle`).
@@ -233,7 +241,7 @@ Where you have the following data structure:
       that, the value which is stored at `intdepth[i]` is (usually) that of the
       fragment which should be stored into the `fragment` depth buffer.
       * This may result in some rare race conditions (e.g. across blocks).
-    * The `flower.obj` test file is good for testing race conditions.
+    * The `flower.gltf` test file is good for testing race conditions.
 * Fragment shading.
   * `Fragment[width][height] depthbuffer ->`
   * Add a shading method, such as Lambert or Blinn-Phong. Lights can be defined
@@ -245,7 +253,7 @@ Where you have the following data structure:
 
 This is a suggested sequence of pipeline steps, but you may choose to alter the
 order of this sequence or merge entire kernels as you see fit.  For example, if
-you decide that doing has benefits, you can choose to merge the vertex shader
+you decide that doing so has benefits, you can choose to merge the vertex shader
 and primitive assembly kernels, or merge the perspective transform into another
 kernel. There is not necessarily a right sequence of kernels, and you may
 choose any sequence that works.  Please document in your README what sequence
@@ -336,10 +344,10 @@ The following resources may be useful for this project.
 The performance analysis is where you will investigate how to make your CUDA
 programs more efficient using the skills you've learned in class. You must have
 performed at least one experiment on your code to investigate the positive or
-negative effects on performance. 
+negative effects on performance.
 
 We encourage you to get creative with your tweaks. Consider places in your code
-that could be considered bottlenecks and try to improve them. 
+that could be considered bottlenecks and try to improve them.
 
 Provide summary of your optimizations (no more than one page), along with
 tables and or graphs to visually explain any performance differences.
