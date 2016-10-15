@@ -66,6 +66,7 @@ OpenGL-style buffers of index and attribute data.
 * Structs for some parts of the pipeline.
 * Fragment buffer to framebuffer copy.
 * CUDA-GL interop.
+* A simple mouse interactive camera that transforms the object.
 
 You will need to implement the following features/pipeline stages:
 
@@ -110,8 +111,8 @@ You are also required to implement at least 2.0 "points" worth in extra features
    switches your pipeline from displaying triangles to displaying a wireframe
    or a point cloud.
 * Anti-aliasing
-   * (0.5) FSAA - full-screen antialiasing
-   * (1.0) FSAA vs MSAA - performance comparison with multi-sample antialiasing
+   * (0.5) SSAA - supersample antialiasing
+   * (1.0) [MSAA](https://mynameismjp.wordpress.com/2012/10/24/msaa-overview/) - multisample antialiasing, and performance comparison with the former one
 * (1.0) Occlusion queries.
 * (1.0) Order-independent translucency using a k-buffer.
 
