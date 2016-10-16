@@ -90,7 +90,7 @@ You are also required to implement at least 2.0 "points" worth in extra features
    * shared memory for some kinds of instancing
    * shared memory uniforms - an array of lights? an array of skinning matrices?
    * tile-based post processing - SSAO? Bloom? Toon Shading?
-* (2.0) [Tile-based pipeline](https://github.com/CIS565-Fall-2015/cis565-fall-2015.github.io/blob/master/10-Mobile-Graphics.pptx?raw=true)
+* (2.0) [Tile-based pipeline](https://github.com/CIS565-Fall-2015/cis565-fall-2015.github.io/blob/master/lectures/10-Mobile-Graphics.pptx?raw=true)
 * Additional pipeline stages.
    * (1.0) Tessellation shader.
    * (1.0) Geometry shader, able to output a variable number of primitives per
