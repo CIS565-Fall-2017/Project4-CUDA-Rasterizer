@@ -29,12 +29,13 @@ bunch of them around so you can pick a few to document your progress.
 * `src/` C++/CUDA source files.
 * `util/` C++ utility files.
 * `gltfs/` Example glTF test files
+  * `gltfs/triangle/triangle.gltf` (1 triangle only, start with this)
   * `gltfs/box/box.gltf` (8 vertices, 12 triangles, start with this)
   * `gltfs/cow/cow.gltf`
   * `gltfs/duck/duck.gltf` (has a diffuse texture)
   * `gltfs/CesiumMilkTruck/CesiumMilkTruck.gltf` (has several textures)
-  * `gltfs/2_cylinder_engine/2_cylinder_engine.gltf` (relatively complex model, no texture)
   * `gltfs/flower/flower.gltf` (model with a lot of layers from most angles)
+  * `gltfs/2_cylinder_engine/2_cylinder_engine.gltf` (relatively complex model, no texture, need to rescale to show in the center of screen)
 * `renders/` Test implementation render result of duck.gltf.
 * `external/` Includes and static libraries for 3rd party libraries.
 
@@ -66,7 +67,7 @@ OpenGL-style buffers of index and vertex attribute data.
 * Structs for some parts of the pipeline.
 * Fragment-buffer-to-framebuffer copy.
 * CUDA-GL interop.
-* A simple interactive camera using the mouse.
+* A simple interactive camera using the mouse. 
 
 You need to implement the following features/pipeline stages:
 
