@@ -1,7 +1,7 @@
 Instructions - CUDA-RASTERIZER
 ========================
 
-This is due **TBD: 2016, evening at midnight**.
+This is due **Tuesday, October 25, evening at midnight**.
 
 **Summary:**
 In this project, you will use CUDA to implement a simplified
@@ -29,7 +29,7 @@ bunch of them around so you can pick a few to document your progress.
 * `src/` C++/CUDA source files.
 * `util/` C++ utility files.
 * `gltfs/` Example glTF test files
-  * `gltfs/box/box.gltf` (8v, 12t, something you can start testing with)
+  * `gltfs/box/box.gltf` (8 vertices, 12 triangles, start with this)
   * `gltfs/cow/cow.gltf`
   * `gltfs/duck/duck.gltf` (has a diffuse texture)
   * `gltfs/CesiumMilkTruck/CesiumMilkTruck.gltf` (has several textures)
@@ -40,7 +40,7 @@ bunch of them around so you can pick a few to document your progress.
 
 ### Running the code
 
-The main function requires a gltf model file. Call the program with
+The main function requires a glTF model file. Call the program with
 one as an argument: `cis565_rasterizer gltfs/duck/duck.gltf`.
 (In Visual Studio, `../gltfs/duck/duck.gltf`.)
 
@@ -59,24 +59,24 @@ You can also launch the built program from command line to feed the arguments.
 In this project, you are given the following code:
 
 * A tiny glTF loader for loading glTF format models and converting them to
-OpenGL-style buffers of index and attribute data.
+OpenGL-style buffers of index and vertex attribute data.
     * [glTF](https://github.com/KhronosGroup/glTF) is a standard model format (Patrick being one of the major contributors).
     No need to worry about its details because it's all done for you, unless
     you would like to support primitives besides triangles.
 * Structs for some parts of the pipeline.
-* Fragment buffer to framebuffer copy.
+* Fragment-buffer-to-framebuffer copy.
 * CUDA-GL interop.
-* A simple mouse interactive camera that transforms the object.
+* A simple interactive camera using the mouse.
 
-You will need to implement the following features/pipeline stages:
+You need to implement the following features/pipeline stages:
 
 * Vertex shading. (`_vertexTransformAndAssembly` in `rasterize.cu`)
 * Primitive assembly with support for triangles read from buffers of index and
-  vertex data. (code already provided , simply uncomment it) (`_primitiveAssembly` in `rasterize.cu`)
+  vertex data. (code already provided, simply uncomment it) (`_primitiveAssembly` in `rasterize.cu`)
 * Rasterization. (create your own function, call it in `rasterize`)
 * Fragment shading. (create your own function, call it in `rasterize`)
 * A depth buffer for storing and depth testing fragments. (you've been provided with a `int * dev_depth`, you can always change to your own version)
-* Fragment to depth buffer writing (**with** atomics for race avoidance).
+* Fragment-to-depth-buffer writing (**with** atomics for race avoidance).
 * (Fragment shader) simple lighting scheme, such as Lambert or Blinn-Phong. (`render` in `rasterize.cu`)
 
 See below for more guidance.
@@ -89,7 +89,7 @@ You are also required to implement at least 2.0 "points" worth in extra features
    * shared memory for some kinds of instancing
    * shared memory uniforms - an array of lights? an array of skinning matrices?
    * tile-based post processing - SSAO? Bloom? Toon Shading?
-* (2.0) Tile-based pipeline
+* (2.0) [Tile-based pipeline](https://github.com/CIS565-Fall-2015/cis565-fall-2015.github.io/blob/master/10-Mobile-Graphics.pptx?raw=true)
 * Additional pipeline stages.
    * (1.0) Tessellation shader.
    * (1.0) Geometry shader, able to output a variable number of primitives per
@@ -97,7 +97,6 @@ You are also required to implement at least 2.0 "points" worth in extra features
    * (0.5 **if not doing geometry shader**) Backface culling, optimized using
      stream compaction (thrust allowed).
    * (1.0) Transform feedback.
-   * (0.5) Scissor test.
    * (0.5) Blending (when writing into framebuffer).
 * (1.0) Instancing: draw one set of vertex data multiple times, each run
   through the vertex shader with a different ID.
