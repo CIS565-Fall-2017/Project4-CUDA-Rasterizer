@@ -85,11 +85,11 @@ See below for more guidance.
 You are also required to implement at least 2.0 "points" worth in extra features.
 (point values are given in parentheses):
 
-* (1.0) Use shared memory in a feature. A few ideas:
-   * shared memory textures
-   * shared memory for some kinds of instancing
-   * shared memory uniforms - an array of lights? an array of skinning matrices?
-   * tile-based post processing - SSAO? Bloom? Toon Shading?
+* (1.0) Use shared memory in a feature. Ideas and suggestions:
+   * Look for areas where you may need to access the same "chunk" of memory multiple times in a single thread
+   * post processing, with the fragment buffer divided into "tiles" - SSAO? Bloom? Toon Shading?
+   * shared memory uniforms - an array of skinning matrices? an array of lights?
+   * could you use shared memory for some kinds of texture-based shaders?
 * (2.0) [Tile-based pipeline](https://github.com/CIS565-Fall-2015/cis565-fall-2015.github.io/blob/master/lectures/10-Mobile-Graphics.pptx?raw=true)
 * Additional pipeline stages.
    * (1.0) Tessellation shader.
