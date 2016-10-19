@@ -21,14 +21,14 @@
       "componentType": 5126,
       "count": 3,
       "min": [
-        -0.715254008769989,
-        -0.5675169825553894,
-        -0.22875000536441803
+        0,
+        0,
+        0
       ],
       "max": [
-        0.7632369995117188,
-        0.5642820000648499,
-        0.24079599976539612
+        0.5,
+        1,
+        0
       ],
       "type": "VEC3"
     },
@@ -40,14 +40,14 @@
       "count": 3,
       "type": "VEC3",
       "min": [
-        -0.2508260905742645,
-        0.35027313232421875,
-        0.9024383425712585
+        0,
+        0,
+        1
       ],
       "max": [
-        -0.2508260905742645,
-        0.35027313232421875,
-        0.9024383425712585
+        0,
+        0,
+        1
       ]
     }
   },
@@ -64,7 +64,7 @@
     "buffer_0": {
       "type": "arraybuffer",
       "byteLength": 78,
-      "uri": "data:application/octet-stream;base64,gGNDPyQonr06k3Y+eQf4vMl0ED9xPWq+4xo3v8tIEb/gLKU8R2yAvgBXsz4zBmc/R2yAvgBXsz4zBmc/R2yAvgBXsz4zBmc/AAABAAIA"
+      "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAAAAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAABAAIA"
     }
   },
   "bufferViews": {
@@ -118,8 +118,8 @@
     }
   },
   "meshes": {
-    "mesh_triangle": {
-      "name": "triangle",
+    "mesh_input": {
+      "name": "input",
       "primitives": [
         {
           "attributes": {
@@ -137,7 +137,7 @@
     "rootNode": {
       "children": [],
       "meshes": [
-        "mesh_triangle"
+        "mesh_input"
       ],
       "matrix": [
         1,
@@ -160,9 +160,9 @@
     }
   },
   "samplers": {},
-  "scene": "scene_triangle",
+  "scene": "scene_input",
   "scenes": {
-    "scene_triangle": {
+    "scene_input": {
       "nodes": [
         "rootNode"
       ]
