@@ -373,10 +373,10 @@ void rasterizeSetBuffers(const tinygltf::Scene & scene) {
 						return;
 
 					// TODO: add new attributes for your PrimitiveDevBufPointers when you add new attributes
-					VertexIndex* dev_indices;
-					VertexAttributePosition* dev_position;
-					VertexAttributeNormal* dev_normal;
-					VertexAttributeTexcoord* dev_texcoord0;
+					VertexIndex* dev_indices = NULL;
+					VertexAttributePosition* dev_position = NULL;
+					VertexAttributeNormal* dev_normal = NULL;
+					VertexAttributeTexcoord* dev_texcoord0 = NULL;
 
 					// ----------Indices-------------
 
