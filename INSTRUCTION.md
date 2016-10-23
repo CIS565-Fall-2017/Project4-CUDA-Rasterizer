@@ -1,7 +1,7 @@
 Instructions - CUDA-RASTERIZER
 ========================
 
-This is due **Tuesday, October 25, evening at midnight**.
+This is due ~~**Tuesday, October 25, evening at midnight**.~~ **Friday, October 28, evening at midnight**
 
 **Summary:**
 In this project, you will use CUDA to implement a simplified
