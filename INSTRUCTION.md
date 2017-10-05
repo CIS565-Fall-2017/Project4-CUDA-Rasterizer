@@ -1,7 +1,7 @@
 Instructions - CUDA-RASTERIZER
 ========================
 
-This is due ~~**Tuesday, October 25, evening at midnight**.~~ **Friday, October 28, evening at midnight**
+This is due **Sunday, October 15, evening at midnight**.
 
 **Summary:**
 In this project, you will use CUDA to implement a simplified
@@ -380,7 +380,6 @@ The title should be "Project 4: YOUR NAME".
 The template of the comment section of your pull request is attached below, you can do some copy and paste:  
 
 * [Repo Link](https://link-to-your-repo)
-* `Your PENNKEY`
 * (Briefly) Mentions features that you've completed. Especially those bells and whistles you want to highlight
     * Feature 0
     * Feature 1

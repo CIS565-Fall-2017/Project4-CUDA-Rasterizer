@@ -71,9 +71,13 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     list(APPEND CMAKE_EXE_LINKER_FLAGS "-lX11 -lXxf86vm -lXrandr -lXi")
 endif()
 
+if (WIN32)
+    list(APPEND CORELIBS legacy_stdio_definitions.lib)
+endif()
+
 # CUDA linker options
 find_package(Threads REQUIRED)
-find_package(CUDA REQUIRED)
+find_package(CUDA 8.0 REQUIRED)
 set(CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE ON)
 set(CUDA_SEPARABLE_COMPILATION ON)
 

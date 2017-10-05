@@ -20,7 +20,8 @@
 
 int main(int argc, char **argv) {
     if (argc != 2) {
-        cout << "Usage: [gltf file]" << endl;
+        cout << "Usage: [gltf file]. Press Enter to exit" << endl;
+		getchar();
         return 0;
     }
 
