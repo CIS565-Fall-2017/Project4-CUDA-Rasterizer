@@ -1,7 +1,7 @@
 Instructions - CUDA-RASTERIZER
 ========================
 
-This is due **Sunday, October 15, evening at midnight**.
+This is due **Tuesday, October 17, evening at midnight**.
 
 **Summary:**
 In this project, you will use CUDA to implement a simplified
@@ -23,6 +23,11 @@ Every image you save should automatically get a different
 filename. Don't delete all of them! For the benefit of your README, keep a
 bunch of them around so you can pick a few to document your progress.
 
+**Important:**
+- If you are not in CGGT/DMD, you may replace this project with a GPU compute
+project. You MUST get this pre-approved by Austin Eng before continuing!
+- You have the option of rewriting this project Vulkan for lots of bonus
+points. Be warned: this is a very hard task.
 
 ### Contents
 
